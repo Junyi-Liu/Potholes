@@ -24,7 +24,7 @@ namespace potholes {
         virtual void ApplyTransformation(clang::Rewriter&) = 0;
     };
     
-   class RewriteCallback : public clang::tooling::EndOfSourceFileCallback {
+   class RewriteCallback : public clang::tooling::SourceFileCallbacks {
     private:
         clang::Rewriter & rewriter;
         Analysis & analysis;
@@ -32,7 +32,8 @@ namespace potholes {
 //        std::ostream& os;
     public:
         // calls rewrite() on all rewriters registered in analysis
-        void run();
+        void handleEndSource();
+
         RewriteCallback(clang::Rewriter & rewriter, potholes::Analysis &, std::ostream& os);
         
         void setSourceMgr(clang::SourceManager &, const clang::LangOptions&);

@@ -16,10 +16,11 @@
 GET_PROPERTY(ENVIRONMENT_PLATFORM_DIR GLOBAL PROPERTY ENVIRONMENT_PLATFORM_DIR)
 
 # find the clang include directory
-find_path(PET_INCLUDE_DIR pet.h
-          PATH_SUFFIXES include
+find_path(PET_INCLUDE_DIR 
+	  NAMES pet.h expr.h tree.h
+          PATH_SUFFIXES include 
           PATHS
-          /usr/local/include/
+          #/Users/Junyi/research/HLS/pet
 	  ${ENVIRONMENT_PLATFORM_DIR}/include
 	  )
 

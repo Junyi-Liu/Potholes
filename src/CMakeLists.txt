@@ -20,8 +20,8 @@ set (POTHOLES_AST_SOURCES affine generate parallel ast statement)
 set(POTHOLES_FRONTEND_SOURCE potholes analysis extract options scop project consumer promote transform rewrite )
 
 
-
-#SET(CMAKE_CXX_FLAGS "-Wall -fno-rtti -O0 -g" )  
+SET(CMAKE_C_FLAGS "-Wall -fno-rtti -O0 -g" )
+SET(CMAKE_CXX_FLAGS "-Wall -fno-rtti -O0 -g" )  
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
 message("${CMAKE_CXX_FLAGS}")

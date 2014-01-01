@@ -48,7 +48,7 @@ include_directories( ${LLVM_INCLUDE_DIRS} )
 link_directories( ${LLVM_LIBRARY_DIRS} )
 add_definitions( ${LLVM_DEFINITIONS} )
 
-llvm_map_components_to_libraries(REQ_LLVM_LIBRARIES jit interpreter nativecodegen bitreader selectiondag asmparser)
+llvm_map_components_to_libraries(REQ_LLVM_LIBRARIES jit interpreter nativecodegen bitreader selectiondag asmparser option)
 
 # Find a compiler which compiles c++ source into llvm bitcode.
 # It first finds clang, then it finds llvm-g++ if there is no clang. 

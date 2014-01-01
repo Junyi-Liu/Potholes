@@ -40,7 +40,7 @@ namespace potholes {
       potholes::ExtractScop::Locations ld;
       ct::CompilationDatabase * database;
    
-      std::set<potholes::Region> regions;
+      //std::set<potholes::Region> regions;
     
       FunctionMap accelerated_functions;
       TransformedMap transformed_files;

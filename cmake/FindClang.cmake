@@ -25,12 +25,14 @@ find_path(CLANG_INCLUDE_DIR clang/Basic/LLVM.h
 	  )
 
 set (CLANG_LIBS
+	clang
 	clangFrontend
 	clangAST
 	clangAnalysis
 	clangBasic
 	clangCodeGen
 	clangDriver
+	clangEdit
 	clangFrontendTool
 	clangTooling
 	clangLex
@@ -44,7 +46,12 @@ set (CLANG_LIBS
 )
 
 foreach(LIB ${CLANG_LIBS})
-	    FIND_LIBRARY(${LIB}_FOUND ${LIB})
+	    FIND_LIBRARY(${LIB}_FOUND 
+			 NAMES ${LIB}
+			 PATH_SUFFIXES lib64 lib
+			 PATHS /usr/local
+			       ${ENVIRONMENT_PLATFORM_DIR}/lib
+			 )
  	    list(APPEND CLANG_LIBRARIES ${${LIB}_FOUND})
 endforeach(LIB)
 
@@ -53,5 +60,5 @@ endforeach(LIB)
 # handle the QUIETLY and REQUIRED arguments and set CLANG_FOUND to TRUE if all listed variables are TRUE
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(CLANG DEFAULT_MSG CLANG_LIBRARIES CLANG_INCLUDE_DIR)
-mark_as_advanced(CLANG_INCLUDE_DIR CLANG_LIBRARY)
+mark_as_advanced(CLANG_INCLUDE_DIR CLANG_LIBRARIES)
 

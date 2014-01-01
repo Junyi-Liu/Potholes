@@ -14,6 +14,7 @@
 
 #include <isl/printer.h>
 #include <pet.h>
+#include </Users/Junyi/research/HLS/pet/expr.h>
 #include <isl/ast_build.h>
 
 isl_printer * pth_print_pet_stmt_type(isl_printer * printer, isl_ast_build * build, pet_expr * expr);

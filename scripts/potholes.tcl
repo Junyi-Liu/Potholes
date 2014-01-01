@@ -1,8 +1,12 @@
 #!/usr/bin/tclsh
 
-set auto_path [linsert $auto_path 0 .]
-set auto_path [linsert $auto_path 0 [file join $::env(ENVIRONMENT_PLATFORM_DIR) lib tcl]]
+set lib_dir "$::env(ENVIRONMENT_PLATFORM_DIR)/lib"
+set scp_dir "$::env(ENVIRONMENT_PLATFORM_DIR)/scripts"
 
+set auto_path [linsert $auto_path 0 $scp_dir]
+set auto_path [linsert $auto_path 0 $lib_dir]
+
+puts $auto_path
 
 package require Potholes
 
@@ -14,7 +18,7 @@ puts "The process pid = $process_pid"
 
 after 10000
 
-set database "/home/sb1708/Work/shared-tools/PoTHoLeS-AutoESL/demo/compile_commands.json"
+set database "/Users/Junyi/research/HLS/application/pth_play/compile_commands.json"
 
 set analysis [Potholes::Analysis #auto $database]
 
@@ -23,9 +27,9 @@ foreach source [$analysis get -sources] {
 }
 
 foreach scop [$analysis get -scops] { 
-    #puts $scop 
+    puts $scop 
     set filename [$scop filename]
-    #puts $filename
+    puts $filename
     $analysis transform -promote-scop-to-function $scop
 
 }
@@ -34,6 +38,9 @@ foreach scop [$analysis get -scops] {
 #    $analysis transform -promote-scop-to-function $scop
     
 set solution "ZynqSolution"
+
+puts "Solution: $solution"
+
 set project [Potholes::Project #auto $analysis $solution]
 
 $project compile

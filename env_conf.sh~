@@ -1,0 +1,9 @@
+
+
+export ENVIRONMENT_CMAKE_MODULES=/Users/Junyi/research/HLS/Potholes/cmake
+export ENVIRONMENT_PLATFORM_DIR=/usr/local
+
+#Printenv | grep ENVIRONMENT_CMAKE_MODULES
+
+#echo $ENVIRONMENT_CMAKE_MODULES
+#echo $ENVIRONMENT_PLATFORM_DIR

@@ -26,41 +26,41 @@
 
 namespace potholes { 
     
-    class Consumer : public clang::ASTConsumer {
+  class Consumer : public clang::ASTConsumer {
         
-      //  virtual bool isValidFile(std::string) = 0;
-      //  virtual bool isValidScop(clang::SourceRange) = 0;
-           virtual void Initialize(clang::ASTContext& Context) = 0;
-       virtual bool HandleTopLevelDecl(clang::DeclGroupRef) = 0;
+    //  virtual bool isValidFile(std::string) = 0;
+    //  virtual bool isValidScop(clang::SourceRange) = 0;
+    virtual void Initialize(clang::ASTContext& Context) = 0;
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef) = 0;
 
-    };
+  };
     
-    class CompositeConsumer : public clang::ASTConsumer {
+  class CompositeConsumer : public clang::ASTConsumer {
     
-    private:
-        Analysis& analysis;
-        RewriteCallback& callback;
-    public: 
-        CompositeConsumer(potholes::Analysis&, potholes::RewriteCallback&);
-        virtual void Initialize(clang::ASTContext& Context);
-        virtual bool HandleTopLevelDecl(clang::DeclGroupRef);
+  private:
+    Analysis& analysis;
+    RewriteCallback& callback;
+  public: 
+    CompositeConsumer(potholes::Analysis&, potholes::RewriteCallback&);
+    virtual void Initialize(clang::ASTContext& Context);
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef);
         
-    };
+  };
     
-    class ConsumerFactory {
+  class ConsumerFactory {
     
     
-    private:
-//        clang::Rewriter& rewriter;
-        potholes::Analysis analysis;
-        potholes::RewriteCallback& callback;
+  private:
+    //        clang::Rewriter& rewriter;
+    potholes::Analysis analysis;
+    potholes::RewriteCallback& callback;
         
-    public:
+  public:
 
-        ConsumerFactory(clang::Rewriter& rewriter, potholes::Analysis & analysis, potholes::RewriteCallback& callback);
-        clang::ASTConsumer* newASTConsumer();
+    ConsumerFactory(clang::Rewriter& rewriter, potholes::Analysis & analysis, potholes::RewriteCallback& callback);
+    clang::ASTConsumer* newASTConsumer();
 
-    };
+  };
     
 }
 

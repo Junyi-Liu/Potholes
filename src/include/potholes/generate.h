@@ -14,7 +14,11 @@
 
 #include <vector>
 #include <map>
+
 #include <pet.h>
+#include </Users/Junyi/research/HLS/pet/expr.h>
+#include </Users/Junyi/research/HLS/pet/tree.h>
+
 /* Appropriate Codegen module */
 
 #include <isl/ast.h>

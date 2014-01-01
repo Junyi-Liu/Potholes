@@ -95,7 +95,7 @@ void potholes::RewriteCallback::emitCode(std::string& filename, std::ostream & o
 
 }
 
-void potholes::RewriteCallback::run() {
+void potholes::RewriteCallback::handleEndSource() {
   // go through all the transforms registered in analysis 
             
               
