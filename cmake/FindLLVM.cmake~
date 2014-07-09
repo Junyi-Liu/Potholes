@@ -1,0 +1,76 @@
+# Follows instructions from this site.
+# http://llvm.org/docs/CMake.html#embedding-llvm-in-your-project
+
+# the llvm version is setting to this variable.
+SET(LLVM_RECOMMEND_VERSION 3.4)
+
+
+GET_PROPERTY(ENVIRONMENT_PLATFORM_DIR GLOBAL PROPERTY ENVIRONMENT_PLATFORM_DIR)
+
+if(NOT DEFINED ${LLVM_ROOT})
+  # find llvm-config. perfers to the one with version suffix, Ex:llvm-config-3.2
+  find_program(LLVM_CONFIG_EXE NAMES "llvm-config-${LLVM_RECOMMAND_VERSION}" "llvm-config" PATHS ${ENVIRONMENT_PLATFORM_DIR}/bin ) 
+
+  # Get the directory of llvm by using llvm-config. also remove whitespaces.
+  execute_process(COMMAND ${LLVM_CONFIG_EXE} --prefix OUTPUT_VARIABLE LLVM_ROOT
+		 OUTPUT_STRIP_TRAILING_WHITESPACE )
+endif()
+
+message(${LLVM_ROOT})
+
+# We incorporate the CMake features provided by LLVM:
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_ROOT}/share/llvm/cmake")
+
+message(${CMAKE_MODULE_PATH})
+
+# Not using version check in find_package is that llvm version is 3.2svn,
+# which is different to 3.2 of debian package pool.
+# So checks version later.
+
+include(LLVMConfig)
+
+# Check whether LLVM 3.2 is found.
+if(NOT ${LLVM_FOUND})
+  message(FATAL_ERROR "LLVM_ROOT(${LLVM_ROOT}) is not a valid LLVM install\n"
+		"You can explicitly specify your llvm_root by "
+		"cmake /where/pinavm/is -DLLVM_ROOT=/my/llvm/install/dir\n"
+		"or make llvm-config visible in $PATH")
+endif()
+
+# Check whether the LLVM version meets our requirement.
+# Maybe an ERROR is better than a WARNING message here?
+if( NOT ("${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}" STREQUAL ${LLVM_RECOMMEND_VERSION} ))
+  message(WARNING "LLVM version is recommanded to be ${LLVM_RECOMMAND_VERSION}")
+endif()
+
+# Use settings from LLVM cmake module.
+include_directories( ${LLVM_INCLUDE_DIRS} )
+link_directories( ${LLVM_LIBRARY_DIRS} )
+add_definitions( ${LLVM_DEFINITIONS} )
+
+llvm_map_components_to_libraries(REQ_LLVM_LIBRARIES jit interpreter nativecodegen bitreader selectiondag asmparser)
+
+# Find a compiler which compiles c++ source into llvm bitcode.
+# It first finds clang, then it finds llvm-g++ if there is no clang. 
+find_program(LLVM_COMPILER "clang++-${LLVM_RECOMMAND_VERSION}"
+		NAMES clang++ clang llvm-g++ llvm-gcc
+		HINTS ${LLVM_ROOT}/bin )
+
+# Checks whether a LLVM_COMPILER is found, give a warning if not found.
+# A warning instread of error is beceuse that we don't need clang during
+# building pinavm.
+if(${LLVM_COMPILER} STREQUAL "LLVM_COMPILER-NOTFOUND")
+  message(WARNING "Could not find clang or llvm-g++."
+		" Please install one of them !")
+endif()
+
+foreach(LIB ${REQ_LLVM_LIBRARIES})
+	    FIND_LIBRARY(${LIB}_FOUND ${LIB})
+ 	    list(APPEND LLVM_LIBRARIES ${${LIB}_FOUND})
+endforeach(LIB)
+
+
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(LLVM DEFAULT_MSG LLVM_LIBRARIES LLVM_INCLUDE_DIRS)
+
