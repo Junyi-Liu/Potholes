@@ -11,6 +11,7 @@
 #include <potholes/analysis.h>
 
 
+
 class RewriteCommand {
 public:
     typedef enum  {Delete, Insert} Type;

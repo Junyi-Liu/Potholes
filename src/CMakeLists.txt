@@ -1,9 +1,12 @@
 # Potholes Library for TCL
 
+#get_property(ENVIRONMENT_CMAKE_MODULES GLOBAL PROPERTY ENVIRONMENT_CMAKE_MODULES)
+#set(CMAKE_MODULE_PATH ${ENVIRONMENT_CMAKE_MODULES})
+set(CMAKE_MODULE_PATH $ENV{ENVIRONMENT_CMAKE_MODULES})
+message("${CMAKE_MODULE_PATH}")
 
-
-find_package(Itcl REQUIRED)
 find_package(TCL REQUIRED)
+find_package(Itcl REQUIRED)
 
 find_package(LLVM REQUIRED)
 find_package(Clang REQUIRED)
@@ -18,9 +21,12 @@ set(POTHOLES_FRONTEND_SOURCE potholes analysis extract options scop project cons
 
 
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+#SET(CMAKE_CXX_FLAGS "-Wall -fno-rtti -O0 -g" )  
 
-SET(CMAKE_CXX_FLAGS "-Wall -fno-rtti -O0 -g " )  
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
+message("${CMAKE_CXX_FLAGS}")
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (CMAKE_HOST_APPLE)
   SET(CMAKE_SHARED_LINKER_FLAGS " -fvisibility=hidden") 

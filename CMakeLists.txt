@@ -1,8 +1,14 @@
 cmake_minimum_required(VERSION 2.6)
+
+#set(CMAKE_CXX_COMPILER clang)
+#set(CMAKE_C_COMPILER clang)
+
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
+
 project(POTHOLES)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Debug)
 
 #if(DEFINED ENV{BUILT_TOOLS})	  
 #    set (BUILT_TOOLS $ENV{BUILT_TOOLS} )
@@ -28,8 +34,8 @@ set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/external/src/cmake/modules")
 #set (CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/external/platforms/${CMAKE_SYSTEM_NAME})
 
-set(CMAKE_CXX_COMPILER c++)
-set(CMAKE_C_COMPILER cc)
+#set(CMAKE_CXX_COMPILER clang)
+#set(CMAKE_C_COMPILER clang)
 
 add_subdirectory(external)
 add_subdirectory(benchmarks)

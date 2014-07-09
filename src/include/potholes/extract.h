@@ -14,7 +14,7 @@
 #include <potholes/scop.h>
 
 #include <map>
-
+#include <set>
 
 
 #include <clang/Basic/SourceManager.h>
