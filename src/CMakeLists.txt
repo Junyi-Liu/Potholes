@@ -23,7 +23,8 @@ set(POTHOLES_FRONTEND_SOURCE potholes analysis extract options scop project cons
 SET(CMAKE_C_FLAGS "-Wall -fno-rtti -O0 -g" )
 SET(CMAKE_CXX_FLAGS "-Wall -fno-rtti -O0 -g" )  
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libc++")
+#-stdlib=libc++
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 message("${CMAKE_CXX_FLAGS}")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)

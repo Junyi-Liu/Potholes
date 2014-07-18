@@ -26,7 +26,7 @@ find_path(PET_INCLUDE_DIR
 
 # find the clang library
 find_library(PET_LIBRARY
-             NAMES libpet.a
+             NAMES pet
              PATH_SUFFIXES lib64 lib
              PATHS   /usr/local
  	     ${ENVIRONMENT_PLATFORM_DIR}/lib
