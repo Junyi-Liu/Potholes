@@ -83,17 +83,22 @@ std::string pth_generate_scop_function_invocation(pet_scop * scop, std::string f
     
 
   isl_id * mem = pth_memory_space_id();
-    
-  ss << "double *" << " " << isl_id_get_name(mem) << ";" << "\n";
+  
+  // Junyi
+  //ss << "double *" << " " << isl_id_get_name(mem) << ";" << "\n";
+  
+  //Junyi
+  //std::vector<std::string> invocation_arguments = pth_generate_scop_function_invocation_arguments(scop);
      
-  std::vector<std::string> invocation_arguments = pth_generate_scop_function_invocation_arguments(scop);
-     
-  std::vector<std::string>::iterator argits = invocation_arguments.begin();
+  //std::vector<std::string>::iterator argits = invocation_arguments.begin();
+  VarMap invocation_arguments = pth_generate_scop_function_prototype_arguments(scop);
+  VarMap::iterator argits = invocation_arguments.begin();
      
   while(argits != invocation_arguments.end()) {
-    if (argits->find("_offset") != std::string::npos) { 
-      ss << "unsigned" << " " << *argits << ";" << "\n";
-    }
+    //Junyi
+    //if (argits->find("_offset") != std::string::npos) { 
+    //ss << "unsigned" << " " << *argits << ";" << "\n";
+      //}
     argits++;
     //    if (argits != invocation_arguments.end()) ss << ",";
   }
@@ -104,7 +109,8 @@ std::string pth_generate_scop_function_invocation(pet_scop * scop, std::string f
   argits = invocation_arguments.begin();
     
   while(argits != invocation_arguments.end()) {
-    ss << *argits;
+    //ss << *argits;
+    ss << "&" <<argits->first;
     argits++;
     if (argits != invocation_arguments.end()) ss << ",";
   }
@@ -130,22 +136,36 @@ VarMap pth_generate_scop_function_prototype_arguments(pet_scop * scop) {
       printer = isl_printer_flush(printer);
   */    
   isl_id * mem = pth_memory_space_id();
-    
-  vm.insert(std::pair<std::string, std::string>(std::string(isl_id_get_name(mem)), "double *"));
+  
+  //Junyi
+  //vm.insert(std::pair<std::string, std::string>(std::string(isl_id_get_name(mem)), "double *"));
     
   // pass scalars by value
   for (unsigned i = 0 ; i < isl_space_dim(space, isl_dim_param) ; i++ ) {
     const char * pname = isl_space_get_dim_name(space, isl_dim_param, i);
-    vm.insert(std::pair<std::string, std::string>(pname, "unsigned"));
+    vm.insert(std::pair<std::string, std::string>(pname, "int*"));
+    //vm.insert(std::pair<std::string, std::string>(pname, "unsigned"));
   }
+  
+  //std::cout<<"isl_dim_param: "<< isl_space_dim(space, isl_dim_param) <<std::endl;
+  // std::cout<<"scop->n_stmt: "<< scop->n_stmt <<std::endl;
+  // std::cout<<"scop->stmts->n_arg: "<< scop->stmts[0]->n_arg <<std::endl;
+  // for (unsigned k = 0 ; k < scop->stmts[0]->n_arg ; k++){
+  //   std::cout<<"arg"<< k <<":: ";
+  //   std::cout<<"name:"<<std::string(scop->stmts[0]->args[k]->name) << ",";
+  //   std::cout<<"type:"<<std::string(scop->stmts[0]->args[k]->type_name) << "." << std::endl;
+  // }
     
   // pass vectors by pointer
   for (int j = 0 ; j < scop->n_array  ; j++ ) {
     pet_array * array = scop->arrays[j];
     std::string element_type = array->element_type;
-    std::string pname = isl_set_get_tuple_name(array->extent) + std::string("_offset");
-    std::string ptype = std::string("unsigned");
-        
+    
+    //Junyi
+    //std::string pname = isl_set_get_tuple_name(array->extent) + std::string("_offset");
+    //std::string ptype = std::string("unsigned");
+    std::string pname = isl_set_get_tuple_name(array->extent);
+    std::string ptype = element_type + std::string("*");
     
     vm.insert(std::pair<std::string, std::string>(pname, ptype));
         
@@ -262,10 +282,10 @@ pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build * build, pth_scop * sc
   pth_expr * lhs_expr = expr->args[pet_bin_lhs];
   pth_expr * rhs_expr = expr->args[pet_bin_rhs];
 
-  printf("lhs_n_arg: %d \n",lhs_expr->n_arg);
-  std::cout<<"lhs_expr read:"<< lhs_expr->acc.read <<std::endl;
-  std::cout<<"lhs_expr write:"<< lhs_expr->acc.write <<std::endl;
-  printf("lhs_expr_type: %d | %d \n",pet_expr_get_type(lhs_expr), pet_expr_access);
+  //printf("lhs_n_arg: %d \n",lhs_expr->n_arg);
+  //std::cout<<"lhs_expr read:"<< lhs_expr->acc.read <<std::endl;
+  //std::cout<<"lhs_expr write:"<< lhs_expr->acc.write <<std::endl;
+  //printf("lhs_expr_type: %d | %d \n",pet_expr_get_type(lhs_expr), pet_expr_access);
 
   // int t = pet_expr_access_get_may_access(lhs_expr) ? 1:0;
   //std::cout<< "map valid:"<< t << std::endl;
@@ -376,6 +396,11 @@ isl_ast_expr * pth_generate_ast_expr_arith(pth_ast_build * build, pth_scop * sco
         
   isl_ast_expr * lhs = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_bin_lhs]);
   isl_ast_expr * rhs = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_bin_rhs]);
+
+  // std::cout<<"isl_ast_expr_type: "<< isl_ast_expr_get_type(lhs) << std::endl;
+  // std::cout<< "arith_hs_is_affine: "<< pet_expr_is_affine(expr->args[pet_bin_lhs]) << std::endl;
+  // std::cout<< "arith_hs_is_read: "<< pet_expr_access_is_read(expr->args[pet_bin_lhs]) << std::endl;
+  // std::cout<< "arith_hs_is_write: "<< pet_expr_access_is_write(expr->args[pet_bin_lhs]) << std::endl;
     
   switch(op) {
   case pet_op_add: output = pth_ast_expr_alloc_binary(isl_ast_op_add, lhs, rhs); break;
@@ -437,6 +462,9 @@ isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build * build, pth_scop * sc
   
     
   pet_op_type op = expr->op;
+
+  //std::cout<<"pet_op_type"<< op <<std::endl;
+
   switch(op) {
   case pet_op_add_assign:  
   case pet_op_sub_assign: 
@@ -475,6 +503,8 @@ isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build * build, pth_scop * sc
 
 isl_ast_expr * pth_generate_ast_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr){
   pet_expr_type type = expr->type;
+
+  //std::cout<< "expr_type: " << type << std::endl;
       
   isl_ast_expr * output = NULL;
       
@@ -785,9 +815,11 @@ std::string pth_generate_scop_function_declaration(pet_scop * pscop, std::string
    std::cout << isl_printer_get_str(printer) << std::endl;
    isl_printer_free(printer);
   */  
-    
-  scop = pth_scop_populate_array_offsets(scop);
-  isl_ast_node_list * definitions_list = pth_scop_populate_array_definitions(scop);
+  
+  //Junyi: remove A = mem+A_offset !!!!!!!!!!!!!
+  //scop = pth_scop_populate_array_offsets(scop);
+  //isl_ast_node_list * definitions_list = pth_scop_populate_array_definitions(scop);
+  isl_ast_node_list * definitions_list = isl_ast_node_list_alloc(isl_set_get_ctx(scop->scop->context), scop->scop->n_array);
     
   std::stringstream ss;
   ss << "void " << pth_generate_scop_name(pscop) << "\n" << "(" << "\n";
@@ -913,3 +945,73 @@ default : {printer = isl_printer_print_str(printer, "other\n");}
 return printer;
 }
 */
+
+
+std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name) {
+
+  pscop = pet_scop_align_params(pscop);
+    
+  pth_scop * scop = pth_scop_alloc(pscop);
+    
+    
+  /* Something fishy here */
+  //isl_union_map * dependencies = pth_calculate_dependencies(scop);
+            
+  //isl_schedule * aschedule  = pth_compute_schedule(scop, dependencies);
+  //    scop = pth_apply_schedule(scop, aschedule);
+ 
+  // scop = pth_apply_tiling(scop, 32);
+    
+  /*    isl_ctx * ctx = isl_set_get_ctx(scop->scop->context);
+   * isl_printer * printer = isl_printer_to_str(ctx);
+   printer = isl_printer_print_union_map(printer, schedule_map);
+   std::cout << isl_printer_get_str(printer) << std::endl;
+   isl_printer_free(printer);
+  */  
+  
+  //Junyi: remove A = mem+A_offset !!!!!!!!!!!!!
+  //scop = pth_scop_populate_array_offsets(scop);
+  //isl_ast_node_list * definitions_list = pth_scop_populate_array_definitions(scop);
+  isl_ast_node_list * definitions_list = isl_ast_node_list_alloc(isl_set_get_ctx(scop->scop->context), scop->scop->n_array);
+    
+  std::stringstream ss;
+    
+  // isl_printer * mprinter = pth_get_printer_from_scop(pscop);
+    
+  isl_union_map * schedule = pet_scop_collect_schedule(pscop);
+  isl_union_set * domain = pet_scop_collect_domains(pscop);
+    
+  // mprinter = isl_printer_print_union_set(mprinter, domain);
+  schedule = isl_union_map_intersect_domain(schedule, domain);
+    
+  
+    
+    
+    
+  
+  // std::cerr << isl_printer_get_str(mprinter) << "\n";
+    
+  isl_ast_print_options * options = isl_ast_print_options_alloc(pth_get_ctx_from_scop(pscop));
+  isl_ast_build * build = isl_ast_build_from_context(pscop->context);
+  options = isl_ast_print_options_set_print_user(options, pth_print_user_statement, scop);
+  build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
+    
+     
+
+    
+  isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
+    
+    
+  definitions_list = isl_ast_node_list_add(definitions_list, node);
+    
+  isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));
+    
+  isl_printer * printer = pth_get_pretty_printer_from_scop(pscop);
+  printer = isl_ast_node_print(block, printer, options);
+  
+  ss << "/* Begin Accelerated Scop */ \n";
+  ss << isl_printer_get_str(printer) << "\n";
+  ss << "/* End Accelerated Scop */ \n";
+
+  return ss.str();
+}

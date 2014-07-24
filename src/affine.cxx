@@ -108,12 +108,13 @@ isl_aff * pth_create_flattening_aff(isl_set * bs,  unsigned size) {
       affine_mapping =isl_aff_set_coefficient_val(affine_mapping, isl_dim_in, isl_local_space_dim(local_space, isl_dim_out) - i - 1, isl_val_copy(num));
               
       if ((i + 1) < isl_local_space_dim(local_space, isl_dim_out) ) {
-	num = isl_val_mul(num, pth_get_dim_size(bs, i)); 
+	num = isl_val_mul(num, pth_get_dim_size(bs, i)); 	
       }
                 
     }
   //std::cerr << "i is " << i << "\n";quit
-  //    return isl_map_from_aff(affine_mapping);	
+  //    return isl_map_from_aff(affine_mapping);
+  //isl_aff_dump(affine_mapping);
   return affine_mapping;
 }
 
@@ -724,7 +725,7 @@ int pth_generate_access_expr_ast(isl_set * set, isl_multi_aff * maff, void * use
   
   unsigned dim_count = isl_multi_aff_dim(maff, isl_dim_out);
   args->indices = isl_ast_expr_list_alloc(ctx, 1);
-            
+  
   isl_id * offset_id = pth_array_offset_lookup(args->scop->array_offsets, args->tuple_id);
     
   for (unsigned i = 0 ; i < isl_multi_aff_dim(maff, isl_dim_out)  ; i++) {
@@ -746,17 +747,47 @@ int pth_generate_access_map_expr_ast(isl_map * amap, void * user) {
   pth_ast_build_with_isl_ast_expr_list * args = (pth_ast_build_with_isl_ast_expr_list *)(user);
   isl_id * memory_space_id = pth_memory_space_id();
   amap =  isl_map_set_tuple_id(amap, isl_dim_out, isl_id_copy(memory_space_id) );  
+  
+  //isl_id_dump(memory_space_id);
+  //isl_map_dump(amap);
 
   isl_pw_multi_aff * pwma = isl_pw_multi_aff_from_map(amap);
   int success = isl_pw_multi_aff_foreach_piece(pwma, pth_generate_access_expr_ast, args);
   return success;
 }
 
+int pth_generate_v_ast(isl_set * set, isl_multi_aff * maff, void * user) {
+
+  pth_ast_build_with_isl_ast_expr_list * args = (pth_ast_build_with_isl_ast_expr_list *)(user);
+  
+  // create ast expression list
+  isl_space * space = isl_set_get_space(set);
+  isl_local_space * local_space = isl_local_space_from_space(space); 
+  isl_ctx * ctx = isl_local_space_get_ctx(local_space);
+  args->indices = isl_ast_expr_list_alloc(ctx, 1);
+ 
+  std::cout<< "multi_aff dim: "<< isl_multi_aff_dim(maff, isl_dim_out)<< std::endl;
+
+  // take out 1st affine
+  isl_aff * aff = isl_multi_aff_get_aff(maff, 0);
+  isl_aff_dump(aff);
+  
+  // build ast expression from affine
+  isl_ast_expr * ast_expr = pth_build_ast_expr_from_aff(aff, args->build);
+  isl_ast_expr_dump(ast_expr);
+  
+  // insert expression
+  args->indices = isl_ast_expr_list_add(args->indices, ast_expr);
+  
+  return 0;
+} 
+
 isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr ) {
   pth_access_t access_info(expr);
   isl_map * map = access_info.access;
     
   isl_space * access_space = isl_map_get_space(map);
+
   isl_ctx * ctx = isl_local_space_get_ctx(isl_local_space_from_space(isl_space_copy(access_space)));
   isl_printer * mprinter = isl_printer_to_str(ctx);
   mprinter = isl_printer_set_output_format(mprinter, ISL_FORMAT_ISL);
@@ -768,20 +799,25 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
   
        
   bool has_tuple_id = isl_space_has_tuple_id(access_space, isl_dim_out);
+
+  //std::cout<<"access_space has tuple id: "<< has_tuple_id << std::endl;
+  isl_map_dump(map);
        
   if (has_tuple_id) {
      
     isl_aff * aff = pth_flatten_expr_access(scop->scop,  isl_map_copy(map),  isl_id_copy(isl_space_get_tuple_id(access_space, isl_dim_out))); 
     isl_map * amap = isl_map_from_pw_aff(isl_pw_aff_from_aff(aff));
     isl_space * space = isl_map_get_space(amap);
-                
-    amap = isl_map_apply_range(map, amap);
-
-    //printf("amap_n:%d \n", isl_union_map_n_map(isl_union_map_from_map(isl_map_copy(amap))));
     
+    //isl_map_dump(amap);
+    amap = isl_map_apply_range(map, amap);
+    //isl_map_dump(amap);
+    
+    //isl_union_map_dump(build->executed);
     isl_union_map * umap = isl_union_map_apply_range(isl_union_map_copy(build->executed), isl_union_map_from_map(isl_map_copy(amap)));
+    //isl_union_map_dump(umap);
 
-    printf("umap_n:%d \n", isl_union_map_n_map(umap));
+    //printf("umap_n:%d \n", isl_union_map_n_map(umap));
     assert(isl_union_map_n_map(umap) == 1);
 
     pth_ast_build_with_isl_ast_expr_list args;
@@ -789,8 +825,8 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
     args.scop = scop;
     args.tuple_id = isl_space_get_tuple_id(access_space, isl_dim_out);
                 
-    int success = isl_union_map_foreach_map(umap, pth_generate_access_map_expr_ast, &args);
-         
+    int success = isl_union_map_foreach_map(umap, pth_generate_access_map_expr_ast, &args);     
+    
     if (success == 0) {
       isl_ast_expr * access_id = isl_ast_expr_from_id(isl_id_copy(args.tuple_id));  
                     
@@ -799,18 +835,55 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
       
   } else { 
           
-           
-    isl_set * bs = isl_map_range(isl_map_copy(map));
-              
-    isl_point * point = isl_set_sample_point(bs);
+    /*       
+    // here just take a specific value as expression AST !!!!!!!
+    isl_set * bs = isl_map_range(isl_map_copy(map));              
+    isl_point * point = isl_set_sample_point(bs);    
     isl_val * val = isl_point_get_coordinate_val(point, isl_dim_set, 0);
     access = isl_ast_expr_from_val(val);
                  
     //mprinter = isl_printer_print_map(mprinter, access_info.access);
     //std::cerr << isl_printer_get_str(mprinter) << "\n";
-        
+    */
+
+    // Junyi for single variable
+    //std::cout<<"access map dim_out name: "<< isl_map_get_dim_name(map, isl_dim_out, 2) <<std::endl;
+    std::cout<<"access map n_param: "<< ( isl_map_n_param(map)) <<std::endl;
+    std::cout<<"access map n_out: "<< ( isl_map_n_out(map)) <<std::endl;
+    std::cout<<"access map n_in: "<< ( isl_map_n_in(map)) << "\n" <<std::endl;
+    
+    isl_map_dump(map);
+
+    // apple loop range to current map
+    isl_union_map * umap = isl_union_map_apply_range(isl_union_map_copy(build->executed), isl_union_map_from_map(isl_map_copy(map)));
+    isl_union_map_dump(umap);
+    
+    isl_map * vmap = isl_map_from_union_map(umap);
+    isl_map_dump(vmap);
+
+    // extract piece-wise multi affine expression of the map input
+    // only this way?!!!!!!!!!!!!!!!!!!!!
+    isl_pw_multi_aff * pwma = isl_pw_multi_aff_from_map(vmap);
+    std::cout<< "pw_multi_aff dim: "<< isl_pw_multi_aff_dim(pwma, isl_dim_out)<< std::endl;
+    
+    // generate ast exprssion list
+    pth_ast_build_with_isl_ast_expr_list args;
+    args.build = build;
+    args.scop = scop;
+    int success = isl_pw_multi_aff_foreach_piece(pwma, pth_generate_v_ast, &args);
+    
+    // check ast exprssion list number
+    int list_n = isl_ast_expr_list_n_ast_expr(args.indices);
+    std::cout<< "list_n: "<< list_n << std::endl;
+    
+    // take 1st ast experission
+    access = isl_ast_expr_list_get_ast_expr(args.indices, 0);
+    //isl_ast_expr_dump(access);
+
   }
-        
+  
+
+  isl_ast_expr_dump(access);
   return access;
 }
     

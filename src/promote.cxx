@@ -91,8 +91,9 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	    clang::SourceLocation file_start = sm.getLocForStartOfFile(sm.translateFile(fe));
 	    clang::SourceLocation fs = file_start.getLocWithOffset(start);
 	    clang::SourceLocation fe = file_start.getLocWithOffset(finish);
-
-	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_invocation(scop->scop, function_name));
+	    
+	    //Junyi
+	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name));
 	  }
 	}
       }
@@ -129,11 +130,14 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
 	  // Inserts scop function declaration
                             
 	  std::stringstream  ss;
-	  ss << "/* Begin Accelerated Scop Definition */ \n";
+	  //ss << "/* Begin Accelerated Scop Definition */ \n";
 
 	  std::string function_name = "accelerated_scop";
-	  ss << pth_generate_scop_function_declaration(scop->scop, function_name) << "\n";
-	  ss << "/* End Accelerated Scop Definition */ \n";
+	  
+	  //Junyi: Remove Declaration for inline transformation
+	  //ss << pth_generate_scop_function_declaration(scop->scop, function_name) << "\n";
+	  
+	  //ss << "/* End Accelerated Scop Definition */ \n\n";
 	  rewriter.InsertTextAfter(insertLocation, ss.str());
 	  analysis.addAcceleratedFunction(getAbsolutePath(*pit), function_name);
 	}
