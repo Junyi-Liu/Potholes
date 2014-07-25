@@ -54,7 +54,7 @@ pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build *, pth_scop *, pth_id 
 
 isl_ast_expr * pth_generate_ast_expr(pth_ast_build *, pth_scop *, pth_stmt *, pth_expr *);
 isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*);
-isl_ast_expr * pth_generate_ast_expr_arith(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*);
+isl_ast_expr * pth_generate_ast_expr_arith(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*, pet_op_type);
 isl_ast_expr * pth_generate_ast_expr_relational(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*);
 isl_ast_expr * pth_generate_ast_expr_unary(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*);
 isl_ast_expr * pth_generate_ast_expr_access(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*);

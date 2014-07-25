@@ -839,11 +839,11 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
 
 }
 
-int ast_expr_op_arg_replace(isl_ast_expr * expr, isl_ast_expr * list, int n){
+int ast_expr_op_arg_replace(isl_ast_expr * expr, isl_ast_expr * list, int * n){
    int n_arg;
    isl_ast_expr * arg;
    int expr_type = isl_ast_expr_get_type(expr);
-   int m;
+   int m = n;
 
    if(expr_type == 0){
      n_arg = isl_ast_expr_get_op_n_arg(expr);

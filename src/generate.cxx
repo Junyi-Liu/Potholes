@@ -281,7 +281,9 @@ pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build * build, pth_scop * sc
    
   pth_expr * lhs_expr = expr->args[pet_bin_lhs];
   pth_expr * rhs_expr = expr->args[pet_bin_rhs];
-
+  
+  //pet_expr_dump(rhs_expr);
+  
   //printf("lhs_n_arg: %d \n",lhs_expr->n_arg);
   //std::cout<<"lhs_expr read:"<< lhs_expr->acc.read <<std::endl;
   //std::cout<<"lhs_expr write:"<< lhs_expr->acc.write <<std::endl;
