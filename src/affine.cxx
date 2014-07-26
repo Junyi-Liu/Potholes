@@ -781,6 +781,35 @@ int pth_generate_v_ast(isl_set * set, isl_multi_aff * maff, void * user) {
   return 0;
 } 
 
+isl_ast_expr * ast_expr_op_arg_replace(isl_ast_expr * expr, isl_ast_expr ** list, int * n_list){
+   int n_arg;
+   isl_ast_expr * arg;
+   int expr_type = isl_ast_expr_get_type(expr);
+
+   if(expr_type == 0){ //expr: op
+     n_arg = isl_ast_expr_get_op_n_arg(expr);
+     // traverse all op args
+     for(int i=n_arg; i>0; i--){
+       arg = isl_ast_expr_get_op_arg(expr, i-1);
+       arg = ast_expr_op_arg_replace(arg, list, n_list);
+       isl_ast_expr_dump(arg);
+       expr = isl_ast_expr_set_op_arg(expr, i-1, arg);
+     }
+   }
+   else if(expr_type == 1){ //expr: id
+     if(*n_list > 0){
+       // replace node
+       expr = list[*n_list-1];
+       *n_list = *n_list-1;
+     }
+   }
+   
+   //isl_ast_expr_dump(expr);
+   // no operation for expr:int
+   return expr;
+
+ }
+
 isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr ) {   
 
   //Check arguments of access
@@ -802,14 +831,26 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   
   // creat access affine
   isl_aff * acc_aff = pth_flatten_expr_access(scop->scop,  isl_map_copy(map),  isl_id_copy(isl_space_get_tuple_id(access_space, isl_dim_out))); 
-  isl_map * acc_map = isl_map_from_pw_aff(isl_pw_aff_from_aff(acc_aff));  
+  isl_map * acc_map = isl_map_from_pw_aff(isl_pw_aff_from_aff(acc_aff)); 
+  
+  std::cout<< "*************************" <<std::endl;
+  isl_map_dump(map);  
+
+  std::cout<< "map_in number: " << isl_map_dim(map, isl_dim_out) << std::endl;
+
+  //isl_map_dump(acc_map);
   acc_map = isl_map_apply_range(map, acc_map);
+  isl_map_dump(acc_map);
+  std::cout<< "*************************" <<std::endl;
+  assert(false);
+
   isl_pw_multi_aff * acc_pwma = isl_pw_multi_aff_from_map(acc_map);
 
   // generate ast exprssion list for access affine
   pth_ast_build_with_isl_ast_expr_list args;
   args.build = build;
   args.scop = scop;
+  args.tuple_id = isl_space_get_tuple_id(access_space, isl_dim_out);
   int success = isl_pw_multi_aff_foreach_piece(acc_pwma, pth_generate_v_ast, &args);
     
   // check ast exprssion list number
@@ -818,44 +859,24 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   
   //take out isl_ast_expr of access expression 
   isl_ast_expr * acc_expr = isl_ast_expr_list_get_ast_expr(args.indices, 0);
-    
-  std::cout<< "################## acc_expr arg_n: "<< isl_ast_expr_get_op_n_arg(acc_expr) <<std::endl;
-  isl_ast_expr * m = isl_ast_expr_get_op_arg(acc_expr, 0);
-  std::cout<< "################## 1st op type: "<<isl_ast_expr_get_op_type(m) <<std::endl;
+  //isl_ast_expr_dump(acc_expr);    
 
-  m = isl_ast_expr_get_op_arg(isl_ast_expr_get_op_arg(acc_expr, 0) , 0);
-  std::cout<< "################## 1st type: "<<isl_ast_expr_get_type(m) <<std::endl;
+  int n_list = expr->n_arg; 
+  // replace op args with the elements of the list recursively
+  acc_expr = ast_expr_op_arg_replace(acc_expr, expr_list, &n_list);
+  std::cout<< "################## n_list: "<<n_list <<std::endl;
+  isl_ast_expr_dump(acc_expr);
+ 
+  // generate final access expression AST
+  isl_ast_expr * access_id = isl_ast_expr_from_id(isl_id_copy(args.tuple_id));   
+  args.indices = isl_ast_expr_list_set_ast_expr(args.indices, 0, acc_expr);
+  isl_ast_expr * access = isl_ast_expr_access(access_id, args.indices); 
+  isl_ast_expr_dump(access);
 
-  assert(false);
-
-  // check if access map is wrapped
-  //std::cout<< "#####access map is wrapped: " << isl_map_domain_is_wrapping(map) << std::endl;
-  // map = isl_map_flatten(isl_map_copy(map));
-  // isl_set * t_set = isl_map_domain(isl_map_copy(map));
-  // isl_set_dump(t_set);
-  // isl_space * t_space = isl_set_get_space(t_set);
-  // t_space = isl_space_unwrap(t_space);
-  // isl_space_dump(t_space);
+  return access;
+  //assert(false);
 
 }
-
-int ast_expr_op_arg_replace(isl_ast_expr * expr, isl_ast_expr * list, int n){
-   int n_arg;
-   isl_ast_expr * arg;
-   int expr_type = isl_ast_expr_get_type(expr);
-   int m;
-
-   if(expr_type == 0){
-     n_arg = isl_ast_expr_get_op_n_arg(expr);
-     for(int i=n_arg; i>0; i--){
-       arg = isl_ast_expr_get_op_arg(expr, i-1);
-       m = ast_expr_op_arg_replace(arg, list, n);
-     }
-   }
-   else if(expr_type == 1)
-   
-
- }
 
 
 isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr ) {
