@@ -16,6 +16,8 @@
 
 #include <cassert>
 
+#include <isl/local_space.h>
+
 struct pth_access_t {
 public:
   isl_map * access;
@@ -828,21 +830,27 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   pth_access_t access_info(expr);
   isl_map * map = access_info.access;
   isl_space * access_space = isl_map_get_space(map);
+
+  std::cout<< "*************************" <<std::endl;
+  isl_local_space * ls = isl_local_space_from_space(isl_space_copy(access_space));
+  isl_local_space_dump(ls);
+  std::cout<< "*************************" <<std::endl;
   
   // creat access affine
   isl_aff * acc_aff = pth_flatten_expr_access(scop->scop,  isl_map_copy(map),  isl_id_copy(isl_space_get_tuple_id(access_space, isl_dim_out))); 
   isl_map * acc_map = isl_map_from_pw_aff(isl_pw_aff_from_aff(acc_aff)); 
   
-  std::cout<< "*************************" <<std::endl;
-  isl_map_dump(map);  
+  // std::cout<< "*************************" <<std::endl;
+  // isl_map_dump(map);  
 
-  std::cout<< "map_in number: " << isl_map_dim(map, isl_dim_out) << std::endl;
+  // std::cout<< "map_in number: " << isl_map_dim(map, isl_dim_out) << std::endl;
 
-  //isl_map_dump(acc_map);
+  // //isl_map_dump(acc_map);
+  // extract out access expression
   acc_map = isl_map_apply_range(map, acc_map);
-  isl_map_dump(acc_map);
-  std::cout<< "*************************" <<std::endl;
-  assert(false);
+  // isl_map_dump(acc_map);
+  // std::cout<< "*************************" <<std::endl;
+  // assert(false);
 
   isl_pw_multi_aff * acc_pwma = isl_pw_multi_aff_from_map(acc_map);
 
@@ -859,7 +867,7 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   
   //take out isl_ast_expr of access expression 
   isl_ast_expr * acc_expr = isl_ast_expr_list_get_ast_expr(args.indices, 0);
-  //isl_ast_expr_dump(acc_expr);    
+  isl_ast_expr_dump(acc_expr);    
 
   int n_list = expr->n_arg; 
   // replace op args with the elements of the list recursively
