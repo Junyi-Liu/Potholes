@@ -831,28 +831,46 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   isl_map * map = access_info.access;
   isl_space * access_space = isl_map_get_space(map);
 
-  std::cout<< "*************************" <<std::endl;
-  isl_local_space * ls = isl_local_space_from_space(isl_space_copy(access_space));
-  isl_local_space_dump(ls);
-  std::cout<< "*************************" <<std::endl;
+  std::cout<< "111111*************************" <<std::endl;
+  //isl_local_space * ls = isl_local_space_from_space(isl_space_copy(access_space));
+  isl_pw_multi_aff * t_aff = isl_pw_multi_aff_from_map(isl_map_copy(map));
+  isl_pw_multi_aff_dump(t_aff);
+  std::cout<< "t_aff dim_out number: " << isl_pw_multi_aff_dim(t_aff, isl_dim_out) <<std::endl;
+
+  std::cout<< "111111*************************" <<std::endl;
   
   // creat access affine
   isl_aff * acc_aff = pth_flatten_expr_access(scop->scop,  isl_map_copy(map),  isl_id_copy(isl_space_get_tuple_id(access_space, isl_dim_out))); 
   isl_map * acc_map = isl_map_from_pw_aff(isl_pw_aff_from_aff(acc_aff)); 
-  
-  // std::cout<< "*************************" <<std::endl;
-  // isl_map_dump(map);  
-
-  // std::cout<< "map_in number: " << isl_map_dim(map, isl_dim_out) << std::endl;
-
-  // //isl_map_dump(acc_map);
-  // extract out access expression
   acc_map = isl_map_apply_range(map, acc_map);
-  // isl_map_dump(acc_map);
-  // std::cout<< "*************************" <<std::endl;
-  // assert(false);
+  isl_map_dump(acc_map);
+  
+  std::cout<< "*************************" <<std::endl; 
+
+  isl_set * dom = isl_map_domain(isl_map_copy(map));
+  isl_set_dump(dom);
+  isl_map * wr = isl_set_unwrap(dom);
+  isl_map_dump(wr);
+ 
+  acc_map = isl_map_flatten_domain(acc_map);
+  isl_id * tp = isl_map_get_tuple_id(wr, isl_dim_in);
+  acc_map = isl_map_set_tuple_id(acc_map, isl_dim_in, tp);
+  //acc_map = isl_map_remove_dims(acc_map, isl_dim_in, 2,1);
+
+  isl_map_dump(acc_map);
+  std::cout<< "acc map_out number: " << isl_map_n_out(acc_map)<< std::endl;
+
+  isl_id * i1 = isl_map_get_dim_id(acc_map, isl_dim_in, 1);
+  isl_id_dump(i1);
+
+  std::cout<< "*************************" <<std::endl;    
+
+  assert(false);
 
   isl_pw_multi_aff * acc_pwma = isl_pw_multi_aff_from_map(acc_map);
+  //isl_pw_multi_aff_dump(acc_pwma);
+
+  
 
   // generate ast exprssion list for access affine
   pth_ast_build_with_isl_ast_expr_list args;
