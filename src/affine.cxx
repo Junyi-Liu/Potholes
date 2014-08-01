@@ -828,53 +828,6 @@ typedef struct {
   int src[1];
 } id_record ;
 
-int detect_src_id_aff(isl_set *set, isl_aff *aff, void *user){
-  
-  id_record * args = (id_record *)(user);
-
-  //std::cout<< "aff div number: " << isl_aff_dim(aff, isl_dim_div) <<std::endl;
-  isl_aff_dump(aff);
-
-  int D = isl_aff_dim(aff, isl_dim_in);
-  isl_val * v;
-
-  for(int i=0 ; i<D; i++){
-    v = isl_aff_get_coefficient_val(aff, isl_dim_in, i);
-    
-    // record non-zero dims
-    if(isl_val_is_zero(v) == 0){      
-      args->src[args->n] = i;
-      args->n = args->n+1;
-      std::cout<< "recording src pos: " << i <<std::endl;
-    }
-    isl_val_free(v);
-  }
-
-  return 0; 
-}
-
-int detect_src_id_map(isl_map *map, void *user){
-
-  id_record * args = (id_record *)(user);
-  
-  // take out pw multi affine
-  isl_pw_multi_aff * pwma = isl_pw_multi_aff_from_map(isl_map_copy(map));
-  isl_pw_multi_aff_dump(pwma);
-  
-  // take out all pw affine
-  //std::cout<< "pwma dim out number: " <<isl_pw_multi_aff_dim(pwma, isl_dim_out) << std::endl;
-  int n_out = isl_pw_multi_aff_dim(pwma, isl_dim_out);
-  for(int i=0; i<n_out; i++){
-    isl_pw_aff * pwa = isl_pw_multi_aff_get_pw_aff(pwma, i);
-    isl_pw_aff_dump(pwa);    
-
-    // explore the pw affine
-    isl_pw_aff_foreach_piece(pwa, detect_src_id_aff, args);    
-  }  
-  
-  return 0;
-}
-
 isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr ) {   
 
   //Check arguments of access
@@ -890,11 +843,35 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   }
   
   std::cout<< "000000*************************" <<std::endl;
+  // record iterator positions
+  // This is a better solution: use build->values
   id_record user;
   user.n = 0;
-  //user.m = 0;
 
-  isl_union_map_foreach_map(build->executed, detect_src_id_map, &user);
+  isl_multi_aff_dump(build->values);
+
+  isl_aff * it_aff;
+  isl_val * co;
+
+  for(int i=0; i<build->depth; i++){
+   it_aff = isl_multi_aff_get_aff(build->values, i); 
+   co = isl_aff_get_coefficient_val(it_aff, isl_dim_in, i);
+   //isl_aff_dump(it_aff);
+   //isl_val_dump(co);
+   
+   // record non-zero dims
+   if(isl_val_is_zero(co) == 0){
+     user.src[user.n] = i;
+     user.n = user.n+1;
+     //std::cout<< "recording src pos: " << i <<std::endl;
+   }
+   isl_val_free(co);
+   isl_aff_free(it_aff);
+  }
+
+  //assert(false);  
+
+  //isl_union_map_foreach_map(build->executed, detect_src_id_map, &user);
   //std::cout<< "non-zero dims number: " << user.n <<std::endl;
   std::cout<< "000000*************************" <<std::endl;
 
@@ -1123,4 +1100,54 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
 //std::cerr << "Access Expression " << isl_printer_get_str(mprinter) << std::endl;
  
 
+// }
+
+////////////////////////////////////////////
+// The following 2 functions are used for scanning valid iterator positions
+////////////////////////////////////////////
+// int detect_src_id_aff(isl_set *set, isl_aff *aff, void *user){
+  
+//   id_record * args = (id_record *)(user);
+
+//   //std::cout<< "aff div number: " << isl_aff_dim(aff, isl_dim_div) <<std::endl;
+//   isl_aff_dump(aff);
+
+//   int D = isl_aff_dim(aff, isl_dim_in);
+//   isl_val * v;
+
+//   for(int i=0 ; i<D; i++){
+//     v = isl_aff_get_coefficient_val(aff, isl_dim_in, i);
+    
+//     // record non-zero dims
+//     if(isl_val_is_zero(v) == 0){      
+//       args->src[args->n] = i;
+//       args->n = args->n+1;
+//       std::cout<< "recording src pos: " << i <<std::endl;
+//     }
+//     isl_val_free(v);
+//   }
+
+//   return 0; 
+// }
+
+// int detect_src_id_map(isl_map *map, void *user){
+
+//   id_record * args = (id_record *)(user);
+  
+//   // take out pw multi affine
+//   isl_pw_multi_aff * pwma = isl_pw_multi_aff_from_map(isl_map_copy(map));
+//   isl_pw_multi_aff_dump(pwma);
+  
+//   // take out all pw affine
+//   //std::cout<< "pwma dim out number: " <<isl_pw_multi_aff_dim(pwma, isl_dim_out) << std::endl;
+//   int n_out = isl_pw_multi_aff_dim(pwma, isl_dim_out);
+//   for(int i=0; i<n_out; i++){
+//     isl_pw_aff * pwa = isl_pw_multi_aff_get_pw_aff(pwma, i);
+//     isl_pw_aff_dump(pwa);    
+
+//     // explore the pw affine
+//     isl_pw_aff_foreach_piece(pwa, detect_src_id_aff, args);    
+//   }  
+  
+//   return 0;
 // }
