@@ -507,6 +507,8 @@ isl_ast_expr * pth_generate_ast_expr(pth_ast_build * build, pth_scop * scop, pth
   pet_expr_type type = expr->type;
 
   //std::cout<< "expr_type: " << type << std::endl;
+
+  isl_ctx * ctx = pet_expr_get_ctx(expr);
       
   isl_ast_expr * output = NULL;
       
@@ -522,10 +524,21 @@ isl_ast_expr * pth_generate_ast_expr(pth_ast_build * build, pth_scop * scop, pth
     assert(false);
   } break;
   case pet_expr_double : {
-    assert(false);
+    // Use isl_id for double numbers 
+    // ** assign double value of the number to the user point of isl_id 
+    isl_id * id = isl_id_alloc(ctx, pet_expr_double_get_str(expr), &(expr->d.val));
+    //isl_id_dump(id);
+    
+    output = isl_ast_expr_from_id(id);
+    //isl_ast_expr_dump(output);
+    assert(output);
   } break;
   case pet_expr_int : {
-    assert(false);
+    // Use isl_val for integer numbers
+    //output = isl_ast_expr_from_val(isl_val_copy(expr->i));
+    output = isl_ast_expr_from_val(pet_expr_int_get_val(expr));
+    //isl_ast_expr_dump(output);
+    assert(output);
   } break;
     
   case pet_expr_op : {
