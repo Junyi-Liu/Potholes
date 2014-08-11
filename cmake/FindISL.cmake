@@ -20,8 +20,11 @@ find_path(ISL_INCLUDE_DIR isl/ctx.h
           PATH_SUFFIXES include
           PATHS
           /usr/local/include/
-	  ${ENVIRONMENT_PLATFORM_DIR}/include
+	  ${ENVIRONMENT_PLATFORM_DIR}/include	  
 	  )
+
+set(ISL_INCLUDE_DIR ${ISL_INCLUDE_DIR} /Users/Junyi/research/HLS/pet/isl)
+message(${ISL_INCLUDE_DIR})
 
 # find the clang library
 find_library(ISL_LIBRARY

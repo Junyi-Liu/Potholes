@@ -1,4 +1,5 @@
 #include <potholes/transform.h>
+#include <iostream>
 
 
 /* class ScopRewriteConsumer : public clang::ASTConsumer {
@@ -53,9 +54,11 @@ bool potholes::PromoteScop::HandleTopLevelDecl(clang::DeclGroupRef d) {
 }
 
 void potholes::PromoteScop::ApplyTransformation(clang::Rewriter& rewriter) {
-      
+
+  // Scop replacement
   removeScop(rewriter);
   insertScop(rewriter);
+
 }
          
 void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
@@ -73,7 +76,11 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
     if (scop) {
       // pet_scop_dump(scop->scop);
 
-
+      // ** Analyze Scop HERE !!!!!!!!!!
+      // isl_set * param = NULL;
+      isl_set * param = analyzeScop(scop->scop);
+      
+      // get scop location information
       unsigned start = pet_loc_get_start(scop->scop->loc);
       unsigned finish = pet_loc_get_end(scop->scop->loc);
       //unsigned start = scop->scop->start;
@@ -93,20 +100,21 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	    clang::SourceLocation fe = file_start.getLocWithOffset(finish);
 	    
 	    //Junyi
-	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name));
+	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name, isl_set_copy(param)));
+
+
 	  }
 	}
       }
 
+      isl_set_free(param);      
 
     }
   }
 
 
 }
-           
-       
-               
+                                 
          
 void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
   Analysis::Files paths = analysis.getSources();
@@ -145,4 +153,21 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
     }
   }
 }
+
+// /*
+//  * User defined Scop Modification
+//  */  
+// void potholes::PromoteScop::changeScop(pet_scop * scop){
+ 
+//   std::cout << "***********Scop Transformation Start****************" << std::endl;
+//   pet_scop_dump(scop);
+//   std::cout << "=======================" << std::endl;
   
+//   isl_set_dump(scop->context);
+
+//   isl_id * p = isl_set_get_dim_id(scop->context, isl_dim_param, 0);
+//   isl_id_dump(p);
+
+//   std::cout << "***********Scop Transformation End****************" << std::endl;  
+
+// }

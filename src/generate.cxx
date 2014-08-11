@@ -53,6 +53,7 @@
 
 #include <potholes/affine.h>
 #include <potholes/parallel.h>
+#include <potholes/transform.h>
 
 #include <sstream>
 #include <iostream>
@@ -63,6 +64,10 @@
 #include <isl/ast_build.h>
 #include <isl/schedule.h>
 #include <isl/flow.h>
+
+#include </Users/Junyi/research/HLS/pet/isl/isl_ast_private.h>
+#include </Users/Junyi/research/HLS/pet/isl/isl_ast_build_private.h>
+#include <potholes/isl_ast_build_expr.h>
 
 void pth_generate_initialize(isl_ctx * ctx) { 
   pth_initialize_memory_space_id(ctx, "mem");
@@ -370,11 +375,11 @@ pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build * build, pth_scop * sc
     
   }
    
-  
-   
-   
+       
   return output;
 }
+
+
 pth_ast_stmt * pth_generate_ast_stmt_call(pth_ast_build * build, pth_scop * scop, pth_id * stmt_id) {
   pet_stmt * stmt = pth_get_scop_statement_by_name(scop, stmt_id);
 
@@ -634,8 +639,6 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
   pth_scop * scop = (pth_scop *)(user);
 
-    
-
   isl_ast_node * node = NULL;
     
   pth_ast_build * pbuild = pth_ast_build_from_isl_ast_build(build);
@@ -645,20 +648,24 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
   if (map_count == 1) {
     isl_id * tuple_id;
-    int success = isl_union_map_foreach_map(pbuild->executed,extract_statement,&tuple_id);
+    int success = isl_union_map_foreach_map(pbuild->executed, extract_statement, &tuple_id);
     (void)(success);
+    
+    // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);
+    
+    // insert generated stmt in scop user pointer
     pth_scop_insert_stmt(scop, stmt);
+    
+    // return node of zero (dummy node)
     isl_val * val = isl_val_zero(pth_ast_build_get_ctx(pbuild));
-    isl_ast_node * node = isl_ast_node_alloc_user(isl_ast_expr_from_val(val));  
+    isl_ast_node * node = isl_ast_node_alloc_user(isl_ast_expr_from_val(val)); 
+    // set statement tuple_id for getting the user_statement to print later
     isl_ast_node_set_annotation(node, tuple_id);
     return node;
-  }
-    
-   
+  }       
 
   assert(false);
-
   return node;
 }
 
@@ -670,9 +677,9 @@ isl_printer * pth_print_call_statement(isl_printer * printer, isl_ast_print_opti
   assert(printer != NULL);
   return printer;   
 }
+
 isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_options * options, pth_scop * scop, pth_ast_stmt * stmt) {
   assert(stmt->type == pth_assign_stmt);
-
     
   isl_ast_expr * lhs_expr = isl_ast_node_user_get_expr(pth_ast_node_to_isl_ast_node(stmt->assign.lhs));
     
@@ -706,16 +713,15 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
 }
 
 isl_printer * pth_print_user_statement(isl_printer * printer, isl_ast_print_options * options, isl_ast_node * node, void * user) {
-    
-     
-   
+            
   pth_scop * scop = (pth_scop *)(user);
     
   // get annotation from node
   pth_id  * statement_id = isl_ast_node_get_annotation(node);
-    
+
+  // look up pth stmt from scop    
   pth_ast_stmt * stmt = pth_ast_get_scop_statement_by_id(scop, statement_id);
-  // look up pth stmt from scop
+
   
   if (stmt) { 
     
@@ -807,7 +813,239 @@ isl_ast_node_list * pth_scop_populate_array_definitions(pth_scop * scop) {
 }
 
 
+std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name, isl_set * param) {
 
+  pscop = pet_scop_align_params(pscop);
+    
+  pth_scop * scop = pth_scop_alloc(pscop);   
+  
+  //Junyi: remove A = mem+A_offset !!!!!!!!!!!!!
+  //scop = pth_scop_populate_array_offsets(scop);
+  //isl_ast_node_list * definitions_list = pth_scop_populate_array_definitions(scop);
+  isl_ast_node_list * definitions_list = isl_ast_node_list_alloc(isl_set_get_ctx(scop->scop->context), scop->scop->n_array);
+    
+  std::stringstream ss;
+    
+  // isl_printer * mprinter = pth_get_printer_from_scop(pscop);
+    
+  isl_union_map * schedule = pet_scop_collect_schedule(pscop);
+  isl_union_set * domain = pet_scop_collect_domains(pscop);
+    
+  // mprinter = isl_printer_print_union_set(mprinter, domain);
+  schedule = isl_union_map_intersect_domain(schedule, domain);           
+  
+  // create isl_ast: build and print_options
+  isl_ast_print_options * options = isl_ast_print_options_alloc(pth_get_ctx_from_scop(pscop));
+  isl_ast_build * build = isl_ast_build_from_context(pscop->context);
+
+  // set to print user statements (create_leaf_user of isl_ast_build)
+  options = isl_ast_print_options_set_print_user(options, pth_print_user_statement, scop);
+
+  // set up AST node generation for every leaf in the generated AST
+  // create_leaf: val_zero, creat_leaf_user: scop with geneated pth_ast_stmt inserted
+  build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
+
+
+  // ** Apply transformation HERE!!!!!!!!!!!!!!
+  if(param != NULL){
+    std::cout << "\n***********Scop Transformation Start****************" << std::endl;
+    // isl_set_dump(param);
+    // isl_space * sp = isl_set_get_space(isl_set_copy(param));
+    // isl_local_space * lsp = isl_local_space_from_space(sp);
+    // isl_aff * aff = isl_aff_var_on_domain(lsp, isl_dim_param, 0);
+    // isl_aff_dump(aff);
+    // isl_pw_aff * pw_aff = isl_pw_aff_alloc(param, aff);
+    // isl_pw_aff_dump(pw_aff);    
+
+    // isl_ast_expr * p_expr = isl_ast_build_expr_from_pw_aff(build, pw_aff);
+    // isl_ast_expr_dump(p_expr);
+
+    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, param);
+    isl_ast_expr_dump(p_expr);
+
+    isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
+    isl_ast_node_dump(p_ast);
+
+    std::cout << "***********Scop Transformation End****************\n" << std::endl; 
+    // generate the whole ast node corresponding to the SCoP and added into one list  
+    // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
+    isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
+    p_ast->u.i.then = isl_ast_node_copy(node);
+    p_ast->u.i.else_node = isl_ast_node_copy(node); 
+    definitions_list = isl_ast_node_list_add(definitions_list, p_ast);  
+    isl_ast_node_free(node);
+  }
+  else{
+    // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
+    isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
+    definitions_list = isl_ast_node_list_add(definitions_list, node); 
+  }
+
+
+  // convert ast_node list into ast block node
+  isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));
+    
+  // Set printer with options
+  isl_printer * printer = pth_get_pretty_printer_from_scop(pscop);
+  printer = isl_ast_node_print(block, printer, options);
+  
+  ss << "/* Begin Accelerated Scop */ \n";
+  ss << isl_printer_get_str(printer) << "\n";
+  ss << "/* End Accelerated Scop */ \n";
+
+  return ss.str();
+}
+
+// check basic set
+int check_bset(isl_basic_set * bset, void *user){
+  
+}
+
+// ast_node general alloc
+__isl_give isl_ast_node *isl_ast_node_alloc(isl_ctx *ctx,
+	enum isl_ast_node_type type)
+{
+	isl_ast_node *node;
+
+	node = isl_calloc_type(ctx, isl_ast_node);
+	if (!node)
+		return NULL;
+
+	node->ctx = ctx;
+	isl_ctx_ref(ctx);
+	node->ref = 1;
+	node->type = type;
+
+	return node;
+}
+
+/* Create an if node with the given guard.
+ *
+ * The then body needs to be filled in later.
+ */
+__isl_give isl_ast_node *isl_ast_node_alloc_if(__isl_take isl_ast_expr *guard)
+{
+	isl_ast_node *node;
+
+	if (!guard)
+		return NULL;
+
+	node = isl_ast_node_alloc(isl_ast_expr_get_ctx(guard), isl_ast_node_if);
+	if (!node)
+		goto error;
+	node->u.i.guard = guard;
+
+	return node;
+error:
+	isl_ast_expr_free(guard);
+	return NULL;
+}
+
+/* Create a new operation expression of operation type "op",
+ * with "n_arg" as yet unspecified arguments.
+ */
+__isl_give isl_ast_expr *isl_ast_expr_alloc_op(isl_ctx *ctx,
+	enum isl_ast_op_type op, int n_arg)
+{
+	isl_ast_expr *expr;
+
+	expr = isl_calloc_type(ctx, isl_ast_expr);
+	if (!expr)
+		return NULL;
+
+	expr->ctx = ctx;
+	isl_ctx_ref(ctx);
+	expr->ref = 1;
+	expr->type = isl_ast_expr_op;
+	expr->u.op.op = op;
+	expr->u.op.n_arg = n_arg;
+	expr->u.op.args = isl_calloc_array(ctx, isl_ast_expr *, n_arg);
+
+	if (n_arg && !expr->u.op.args)
+		return isl_ast_expr_free(expr);
+
+	return expr;
+}
+
+/* Create a new integer expression representing "i".
+ */
+__isl_give isl_ast_expr *isl_ast_expr_alloc_int_si(isl_ctx *ctx, int i)
+{
+	isl_ast_expr *expr;
+
+	expr = isl_calloc_type(ctx, isl_ast_expr);
+	if (!expr)
+		return NULL;
+
+	expr->ctx = ctx;
+	isl_ctx_ref(ctx);
+	expr->ref = 1;
+	expr->type = isl_ast_expr_int;
+	expr->u.v = isl_val_int_from_si(ctx, i);
+	if (!expr->u.v)
+		return isl_ast_expr_free(expr);
+
+	return expr;
+}
+
+/* Create an expression representing the binary operation "type"
+ * applied to "expr1" and "expr2".
+ */
+__isl_give isl_ast_expr *isl_ast_expr_alloc_binary(enum isl_ast_op_type type,
+	__isl_take isl_ast_expr *expr1, __isl_take isl_ast_expr *expr2)
+{
+	isl_ctx *ctx;
+	isl_ast_expr *expr = NULL;
+
+	if (!expr1 || !expr2)
+		goto error;
+
+	ctx = isl_ast_expr_get_ctx(expr1);
+	expr = isl_ast_expr_alloc_op(ctx, type, 2);
+	if (!expr)
+		goto error;
+
+	expr->u.op.args[0] = expr1;
+	expr->u.op.args[1] = expr2;
+
+	return expr;
+error:
+	isl_ast_expr_free(expr1);
+	isl_ast_expr_free(expr2);
+	return NULL;
+}
+
+/* Does "aff" only attain non-negative values over build->domain?
+ * That is, does it not attain any negative values?
+ */
+int isl_ast_build_aff_is_nonneg(__isl_keep isl_ast_build *build,
+	__isl_keep isl_aff *aff)
+{
+	isl_set *test;
+	int empty;
+
+	if (!build)
+		return -1;
+
+	aff = isl_aff_copy(aff);
+	test = isl_set_from_basic_set(isl_aff_neg_basic_set(aff));
+	test = isl_set_intersect(test, isl_set_copy(build->domain));
+	empty = isl_set_is_empty(test);
+	isl_set_free(test);
+
+	return empty;
+}
+
+/* Return the iterator attached to the internal schedule dimension "pos".
+ */
+__isl_give isl_id *isl_ast_build_get_iterator_id(
+	__isl_keep isl_ast_build *build, int pos)
+{
+	if (!build)
+		return NULL;
+
+	return isl_id_list_get_id(build->iterators, pos);
+}
 
 std::string pth_generate_scop_function_declaration(pet_scop * pscop, std::string function_name) {
 
@@ -888,7 +1126,6 @@ std::string pth_generate_scop_function_declaration(pet_scop * pscop, std::string
   return ss.str();
 }
 
-
 /*isl_multi_pw_aff * somefunc(isl_multi_pw_aff *mpa, isl_id *id, void *user) {
   isl_space * space = isl_multi_pw_aff_get_space(mpa);
   isl_ctx * ctx = isl_space_get_ctx(space);
@@ -960,73 +1197,3 @@ default : {printer = isl_printer_print_str(printer, "other\n");}
 return printer;
 }
 */
-
-
-std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name) {
-
-  pscop = pet_scop_align_params(pscop);
-    
-  pth_scop * scop = pth_scop_alloc(pscop);
-    
-    
-  /* Something fishy here */
-  //isl_union_map * dependencies = pth_calculate_dependencies(scop);
-            
-  //isl_schedule * aschedule  = pth_compute_schedule(scop, dependencies);
-  //    scop = pth_apply_schedule(scop, aschedule);
- 
-  // scop = pth_apply_tiling(scop, 32);
-    
-  /*    isl_ctx * ctx = isl_set_get_ctx(scop->scop->context);
-   * isl_printer * printer = isl_printer_to_str(ctx);
-   printer = isl_printer_print_union_map(printer, schedule_map);
-   std::cout << isl_printer_get_str(printer) << std::endl;
-   isl_printer_free(printer);
-  */  
-  
-  //Junyi: remove A = mem+A_offset !!!!!!!!!!!!!
-  //scop = pth_scop_populate_array_offsets(scop);
-  //isl_ast_node_list * definitions_list = pth_scop_populate_array_definitions(scop);
-  isl_ast_node_list * definitions_list = isl_ast_node_list_alloc(isl_set_get_ctx(scop->scop->context), scop->scop->n_array);
-    
-  std::stringstream ss;
-    
-  // isl_printer * mprinter = pth_get_printer_from_scop(pscop);
-    
-  isl_union_map * schedule = pet_scop_collect_schedule(pscop);
-  isl_union_set * domain = pet_scop_collect_domains(pscop);
-    
-  // mprinter = isl_printer_print_union_set(mprinter, domain);
-  schedule = isl_union_map_intersect_domain(schedule, domain);
-    
-  
-    
-    
-    
-  
-  // std::cerr << isl_printer_get_str(mprinter) << "\n";
-    
-  isl_ast_print_options * options = isl_ast_print_options_alloc(pth_get_ctx_from_scop(pscop));
-  isl_ast_build * build = isl_ast_build_from_context(pscop->context);
-  options = isl_ast_print_options_set_print_user(options, pth_print_user_statement, scop);
-  build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
-    
-     
-
-    
-  isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
-    
-    
-  definitions_list = isl_ast_node_list_add(definitions_list, node);
-    
-  isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));
-    
-  isl_printer * printer = pth_get_pretty_printer_from_scop(pscop);
-  printer = isl_ast_node_print(block, printer, options);
-  
-  ss << "/* Begin Accelerated Scop */ \n";
-  ss << isl_printer_get_str(printer) << "\n";
-  ss << "/* End Accelerated Scop */ \n";
-
-  return ss.str();
-}

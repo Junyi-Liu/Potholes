@@ -12,38 +12,122 @@
 #include <potholes/rewrite.h>
 #include <potholes/consumer.h>
 
+struct aff_check_info {
+  
+  isl_aff * src;
+  isl_set * dom;
+  isl_set * ctx;
+  isl_set ** par;
+      
+};
+typedef struct aff_check_info aff_check_info;
+
+struct acc_info {
+  
+  const char * name;
+
+  // line number
+  //int line;
+
+  // map
+  isl_map * map;
+
+  // affine
+  isl_aff * aff;
+
+  // parameters (uncertain variable)
+  int n_pt;
+  int *pt_coeff;
+  
+  // iterators
+  int n_it;
+  int *it_coeff;
+
+  // constant
+  int cnt;
+      
+};
+typedef struct acc_info acc_info;
+
+struct stmt_info{
+
+  isl_aff * src;
+  
+  isl_set * domain;
+  isl_set * context;
+  isl_set * param;
+
+  // statement memeory access info
+  int n_acc_wr = 0; 
+  acc_info *acc_wr; 
+  int n_acc_rd = 0; 
+  acc_info *acc_rd; 
+
+  /* int n_acc = 0; */
+  /* acc_info *acc; */
+
+  int n_pt;
+  int n_it;  
+    
+};
+typedef struct stmt_info stmt_info;
+
+/* struct trans_info{ */
+  
+/*   // control whether apply transforamtion */
+/*   int valid = 0; */
+   
+/*   // parameter seperation points */
+/*   isl_set * param;     */
+/* }; */
+/* typedef struct trans_info trans_info;  */ 
+
 namespace potholes { 
+
+  class Transform : public potholes::Consumer, potholes::Rewriter { 
+
+  public:
+    Analysis& analysis;
+    // applied to particular scop
+    // specific function for consumer initialization
+        
+    // specific function for rewrite callback (makes changes to rewrite tree in analysis
+        
+    virtual void Initialize(clang::ASTContext& Context) = 0;
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef d) = 0;
+    virtual void ApplyTransformation(clang::Rewriter&) = 0;
+        
+    Transform(Analysis&);
+
+  };
     
-    class Transform : public potholes::Consumer, potholes::Rewriter { 
-    public:
-        Analysis& analysis;
-        // applied to particular scop
-        // specific function for consumer initialization
-        
-        // specific function for rewrite callback (makes changes to rewrite tree in analysis
-        
-        virtual void Initialize(clang::ASTContext& Context) = 0;
-        virtual bool HandleTopLevelDecl(clang::DeclGroupRef d) = 0;
-        virtual void ApplyTransformation(clang::Rewriter&) = 0;
-        
-        Transform(Analysis&);
-    };
+  class PromoteScop : public Transform { 
     
-    class PromoteScop : public Transform { 
-    
-    public:
-        PromoteScop(Analysis&);
-        virtual void Initialize(clang::ASTContext& Context);
-        virtual bool HandleTopLevelDecl(clang::DeclGroupRef d);
-        virtual void ApplyTransformation(clang::Rewriter&);
+  public:
+    PromoteScop(Analysis&);
+    virtual void Initialize(clang::ASTContext& Context);
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef d);
+    virtual void ApplyTransformation(clang::Rewriter&);
         
-    private:
-        void removeScop(clang::Rewriter&);
-        void insertScop(clang::Rewriter&);
+  private:
+    void removeScop(clang::Rewriter&);
+    void insertScop(clang::Rewriter&);       
         
-    };
+  };
     
 }
+
+int aff_scan(isl_set *set, isl_aff *aff, void *user);
+int acc_expr_scan(pet_expr *expr, void *user);
+int acc_expr_info(pet_expr *expr, void *user);
+int acc_order(void * first, void * second);
+int check_aff_diff(isl_set * set, isl_aff * aff, void * user);
+int dep_analysis(isl_map * dep, int must, void * dep_user, void * user);
+
+//User defined SCoP analysis
+isl_set * analyzeScop(pet_scop * scop); 
+
+
 
 #endif	/* TRANSFORM_H */
 
