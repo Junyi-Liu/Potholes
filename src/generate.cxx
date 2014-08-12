@@ -813,7 +813,7 @@ isl_ast_node_list * pth_scop_populate_array_definitions(pth_scop * scop) {
 }
 
 
-std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name, isl_set * param) {
+std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name) {
 
   pscop = pet_scop_align_params(pscop);
     
@@ -845,22 +845,14 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // create_leaf: val_zero, creat_leaf_user: scop with geneated pth_ast_stmt inserted
   build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
 
+  // ** Analyze Scop HERE !!!!!!!!!!
+  isl_set * param = analyzeScop(pscop);
 
   // ** Apply transformation HERE!!!!!!!!!!!!!!
   if(param != NULL){
     std::cout << "\n***********Scop Transformation Start****************" << std::endl;
     // isl_set_dump(param);
-    // isl_space * sp = isl_set_get_space(isl_set_copy(param));
-    // isl_local_space * lsp = isl_local_space_from_space(sp);
-    // isl_aff * aff = isl_aff_var_on_domain(lsp, isl_dim_param, 0);
-    // isl_aff_dump(aff);
-    // isl_pw_aff * pw_aff = isl_pw_aff_alloc(param, aff);
-    // isl_pw_aff_dump(pw_aff);    
-
-    // isl_ast_expr * p_expr = isl_ast_build_expr_from_pw_aff(build, pw_aff);
-    // isl_ast_expr_dump(p_expr);
-
-    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, param);
+    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, isl_set_copy(param));
     isl_ast_expr_dump(p_expr);
 
     isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
@@ -880,7 +872,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     definitions_list = isl_ast_node_list_add(definitions_list, node); 
   }
-
+  isl_set_free(param);
 
   // convert ast_node list into ast block node
   isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));
@@ -893,13 +885,11 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   ss << isl_printer_get_str(printer) << "\n";
   ss << "/* End Accelerated Scop */ \n";
 
+  isl_ast_node_free(block);
+  isl_printer_free(printer);
   return ss.str();
 }
 
-// check basic set
-int check_bset(isl_basic_set * bset, void *user){
-  
-}
 
 // ast_node general alloc
 __isl_give isl_ast_node *isl_ast_node_alloc(isl_ctx *ctx,

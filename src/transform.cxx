@@ -76,6 +76,8 @@ int acc_expr_scan(pet_expr *expr, void *user){
   }else {
     if(pet_expr_access_is_read(expr) == 0){
       std::cerr<<"unknown access type"<<std::endl;
+      isl_map_free(map);
+      return -1;
     }
     acc = &(info->acc_rd[info->n_acc_rd]);    
     info->n_acc_rd = info->n_acc_rd +1;
@@ -181,16 +183,21 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
 
   // ** check emptiness for whether further check parameters
 
-  isl_set ** empty;
-  bd = isl_set_partial_lexmin(bd, isl_set_copy(args->context), empty);
+  isl_set * empty;
+  bd = isl_set_partial_lexmin(bd, isl_set_copy(args->context), &empty);
   isl_set_dump(bd);
-  isl_set_dump(*empty);
+  isl_set_dump(empty);
 
-  args->param = isl_set_copy(*empty);
+  if(!args->param){
+    args->param = isl_set_copy(empty);
+  }
+  else{
+    args->param = isl_set_intersect(args->param,isl_set_copy(empty));
+  }
   //args->param = isl_set_params(*empty);
 
   //isl_set_dump(args->param); 
-  isl_set_free(*empty);
+  isl_set_free(empty);
   isl_set_free(bd);
   isl_set_free(set);
   isl_aff_free(aff);
@@ -207,7 +214,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   isl_map_dump(dep);
   
   //isl_set_dump(isl_map_domain(isl_map_copy(dep)));
-  isl_pw_multi_aff * pwm_aff = isl_pw_multi_aff_from_map(isl_map_copy(dep));
+  isl_pw_multi_aff * pwm_aff = isl_pw_multi_aff_from_map(dep);
   isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
   isl_pw_aff_dump(snk);
 
@@ -228,7 +235,6 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   //isl_set_dump(stmt->param);
   isl_pw_aff_free(snk);
   isl_aff_free(stmt->src);
-  isl_map_free(dep);
   return 0;
 
 }
@@ -280,11 +286,17 @@ isl_set * analyzeScop(pet_scop * scop){
   // scan expression
   stmt.n_acc_wr = 0;
   stmt.n_acc_rd = 0;
-  int s2 = pet_tree_foreach_access_expr(scop->stmts[0]->body, acc_expr_scan, &stmt);  
+  int s2 = pet_tree_foreach_access_expr(scop->stmts[0]->body, acc_expr_scan, &stmt);
+
+  if (s2 == -1){
+    isl_set_free(stmt.domain);
+    isl_set_free(stmt.context);
+    return NULL;
+  } 
   
   //analyze parameter range
   // S-Wr S-Rd
-  isl_map_dump(acc_rd[0].map);
+  //isl_map_dump(acc_rd[0].map);
   isl_access_info * access = isl_access_info_alloc(isl_map_copy(acc_rd[0].map), &(acc_rd[0]), acc_order, 1);
   access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
 

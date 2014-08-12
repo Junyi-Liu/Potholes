@@ -12,6 +12,44 @@
 #include <potholes/rewrite.h>
 #include <potholes/consumer.h>
 
+namespace potholes { 
+
+  class Transform : public potholes::Consumer, potholes::Rewriter { 
+
+  public:
+    Analysis& analysis;
+    // applied to particular scop
+    // specific function for consumer initialization
+        
+    // specific function for rewrite callback (makes changes to rewrite tree in analysis
+        
+    virtual void Initialize(clang::ASTContext& Context) = 0;
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef d) = 0;
+    virtual void ApplyTransformation(clang::Rewriter&) = 0;
+        
+    Transform(Analysis&);
+
+  };
+    
+  class PromoteScop : public Transform { 
+    
+  public:
+    PromoteScop(Analysis&);
+    virtual void Initialize(clang::ASTContext& Context);
+    virtual bool HandleTopLevelDecl(clang::DeclGroupRef d);
+    virtual void ApplyTransformation(clang::Rewriter&);
+        
+  private:
+    void removeScop(clang::Rewriter&);
+    void insertScop(clang::Rewriter&);       
+        
+  };
+    
+}
+
+/*
+ * SCoP Analysis 
+ */
 struct aff_check_info {
   
   isl_aff * src;
@@ -71,51 +109,6 @@ struct stmt_info{
     
 };
 typedef struct stmt_info stmt_info;
-
-/* struct trans_info{ */
-  
-/*   // control whether apply transforamtion */
-/*   int valid = 0; */
-   
-/*   // parameter seperation points */
-/*   isl_set * param;     */
-/* }; */
-/* typedef struct trans_info trans_info;  */ 
-
-namespace potholes { 
-
-  class Transform : public potholes::Consumer, potholes::Rewriter { 
-
-  public:
-    Analysis& analysis;
-    // applied to particular scop
-    // specific function for consumer initialization
-        
-    // specific function for rewrite callback (makes changes to rewrite tree in analysis
-        
-    virtual void Initialize(clang::ASTContext& Context) = 0;
-    virtual bool HandleTopLevelDecl(clang::DeclGroupRef d) = 0;
-    virtual void ApplyTransformation(clang::Rewriter&) = 0;
-        
-    Transform(Analysis&);
-
-  };
-    
-  class PromoteScop : public Transform { 
-    
-  public:
-    PromoteScop(Analysis&);
-    virtual void Initialize(clang::ASTContext& Context);
-    virtual bool HandleTopLevelDecl(clang::DeclGroupRef d);
-    virtual void ApplyTransformation(clang::Rewriter&);
-        
-  private:
-    void removeScop(clang::Rewriter&);
-    void insertScop(clang::Rewriter&);       
-        
-  };
-    
-}
 
 int aff_scan(isl_set *set, isl_aff *aff, void *user);
 int acc_expr_scan(pet_expr *expr, void *user);

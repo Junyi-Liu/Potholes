@@ -44,7 +44,7 @@ VarMap pth_generate_scop_function_prototype_arguments(pet_scop * scop);
 std::vector<std::string> pth_generate_scop_function_invocation_arguments(pet_scop * scop);   
 std::string pth_generate_scop_function_invocation(pet_scop * scop, std::string name);
 std::string pth_generate_scop_function_declaration(pet_scop * scop, std::string name);
-std::string pth_generate_scop_function_replace(pet_scop * scop, std::string name, isl_set * param);
+std::string pth_generate_scop_function_replace(pet_scop * scop, std::string name);
   void pth_generate_initialize(isl_ctx * );      
 
 pth_stmt * pth_get_scop_statement_by_id(pth_scop *, pth_id *);
@@ -64,9 +64,7 @@ isl_ast_expr * pth_generate_ast_expr_access(pth_ast_build*, pth_scop*, pth_stmt*
 isl_ast_expr * pth_generate_ast_expr_call(pth_ast_build*, pth_scop*, pth_stmt*, pth_expr*);
 
 
-int check_bset(isl_basic_set * bset, void *user);
-int check_constraint(isl_constraint * c, void *user);
-
+// ISL AST expr and build functions for set 
 __isl_give isl_ast_expr *isl_ast_expr_alloc_int_si(isl_ctx *ctx, int i);
 __isl_give isl_ast_expr *isl_ast_expr_alloc_binary(enum isl_ast_op_type type, __isl_take isl_ast_expr *expr1, __isl_take isl_ast_expr *expr2);
 int isl_ast_build_aff_is_nonneg(__isl_keep isl_ast_build *build, __isl_keep isl_aff *aff);

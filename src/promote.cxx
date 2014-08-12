@@ -78,7 +78,7 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 
       // ** Analyze Scop HERE !!!!!!!!!!
       // isl_set * param = NULL;
-      isl_set * param = analyzeScop(scop->scop);
+      //isl_set * param = analyzeScop(scop->scop);
       
       // get scop location information
       unsigned start = pet_loc_get_start(scop->scop->loc);
@@ -100,15 +100,15 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	    clang::SourceLocation fe = file_start.getLocWithOffset(finish);
 	    
 	    //Junyi
-	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name, isl_set_copy(param)));
+	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name));
 
 
 	  }
 	}
       }
 
-      isl_set_free(param);      
-
+      // isl_set_free(param);     
+      
     }
   }
 
