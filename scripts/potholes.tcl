@@ -16,7 +16,8 @@ set process_pid [pid]
 
 puts "The process pid = $process_pid"
 
-after 10000
+#after 10000
+after 1000
 
 set database "/Users/Junyi/research/HLS/application/pth_play/compile_commands.json"
 
