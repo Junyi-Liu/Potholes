@@ -29,12 +29,12 @@ package ifneeded Potholes 1.0 [list apply {dir {
     }    
    
     uplevel 1 [list source [file join $dir preparePackage.tcl] ]
+
+    puts "before library setting"
+
     get_platform_library_extension $dir 
     #uplevel 1 [list source [file join $dir loadPackage.tcl] ] 
     uplevel 1 [list source [file join $dir analysis.tcl] ]
     uplevel 1 [list source [file join $dir scop.tcl] ]
-
-    puts "before PROJECT setting"
-
     uplevel 1 [list source [file join $dir project.tcl] ]  
 }} $dir]
