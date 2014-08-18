@@ -1,12 +1,12 @@
 #!/usr/bin/tclsh
 
 set lib_dir "$::env(ENVIRONMENT_PLATFORM_DIR)/lib"
-set lib64_dir "$::env(ENVIRONMENT_PLATFORM_DIR)/lib64/tcl8.5"
+#set lib64_dir "$::env(ENVIRONMENT_PLATFORM_DIR)/lib64/tcl8.5"
 set scp_dir "$::env(ENVIRONMENT_PLATFORM_DIR)/scripts"
 
 set auto_path [linsert $auto_path 0 $scp_dir]
 set auto_path [linsert $auto_path 0 $lib_dir]
-set auto_path [linsert $auto_path 0 $lib64_dir]
+#set auto_path [linsert $auto_path 0 $lib64_dir]
 
 puts $auto_path
 

@@ -16,7 +16,18 @@ proc get_platform_library_extension { dir } {
 }
 
 package ifneeded Potholes 1.0 [list apply {dir {
-#    set ::env(ITCL_LIBRARY) [file join $::env(ENVIRONMENT_PLATFORM_DIR) lib tcl]   
+#    set ::env(ITCL_LIBRARY) [file join $::env(ENVIRONMENT_PLATFORM_DIR) lib tcl]
+    switch $::tcl_platform(os) { 
+	Darwin {
+	}
+	Linux { 
+	    set ::env(ITCL_LIBRARY) [file join $::env(ENVIRONMENT_PLATFORM_DIR) lib64 tcl8.5]
+	}
+	default {
+	    error "Error : Unsupported Platform"
+	}
+    }
+   
     uplevel 1 [list source [file join $dir preparePackage.tcl] ]
     get_platform_library_extension $dir 
     #uplevel 1 [list source [file join $dir loadPackage.tcl] ] 
