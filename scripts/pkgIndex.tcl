@@ -21,7 +21,7 @@ package ifneeded Potholes 1.0 [list apply {dir {
 	Darwin {
 	}
 	Linux { 
-	    set ::env(ITCL_LIBRARY) [file join $::env(ENVIRONMENT_PLATFORM_DIR) lib64 tcl8.5 itcl3.4]
+	    set ::env(ITCL_LIBRARY) [file join $::env(ENVIRONMENT_PLATFORM_DIR)/.. lib64 tcl8.5 itcl3.4]
 	}
 	default {
 	    error "Error : Unsupported Platform"
