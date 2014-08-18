@@ -45,7 +45,8 @@ namespace eval ::Potholes:: {
 		puts $flag
 	    }
 
-	    add_files -cflags $flags $project_file 
+	    #add_files -cflags $flags $project_file
+	    add_files $project_file
 	    set_directive_top -name top [$this get -function $project_file]
 	}
 
