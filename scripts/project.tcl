@@ -10,7 +10,7 @@ namespace eval ::Potholes:: {
 	set analysis $avar
         init $analysis $solution
 
-	if { [string match "*vivado_hls_bin" [info nameofexecutable]] } {
+	if { [string match "*vivado_hls" [info nameofexecutable]] } {
 	    puts "Created Vivado HLS Project"
 	    open_project potholes
 	    open_solution $solution
@@ -19,7 +19,7 @@ namespace eval ::Potholes:: {
     }
 
     destructor { 
-	if { [string match "*vivado_hls_bin" [info nameofexecutable]] } {
+	if { [string match "*vivado_hls" [info nameofexecutable]] } {
 	    puts "Closing Vivado HLS Project"
 	    close_solution 
 	    close_project 
