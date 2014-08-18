@@ -847,10 +847,20 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 
   // ** Analyze Scop HERE !!!!!!!!!!
   isl_set * param = analyzeScop(pscop);
+  int sw;
+  if(param == NULL || isl_set_is_empty(param)){
+    // not able to apply transformation
+    sw = 0;
+  }
+  else{
+    sw = 1;
+  }
 
   // ** Apply transformation HERE!!!!!!!!!!!!!!
-  if(param != NULL){
+  if(sw){
     std::cout << "\n***********Scop Transformation Start****************" << std::endl;
+    // check universality at first !!!!!!!
+    //isl_set_plain_is_universe(param)
     // isl_set_dump(param);
     isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, isl_set_copy(param));
     isl_ast_expr_dump(p_expr);
@@ -872,6 +882,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     definitions_list = isl_ast_node_list_add(definitions_list, node); 
   }
+
+  // clean param set!!!!!!
   isl_set_free(param);
 
   // convert ast_node list into ast block node

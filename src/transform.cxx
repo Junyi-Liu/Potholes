@@ -156,13 +156,16 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   
   stmt_info * args = (stmt_info *)user;
 
-  // src-snk + l-1 >=0
+  // src-snk + L-1 >=0
   // affine: source-sink = -distance
   isl_aff * diff = isl_aff_sub(isl_aff_copy(args->src), isl_aff_copy(aff)); 
   isl_aff_dump(diff);
   isl_constraint * cst = isl_inequality_from_aff(diff); 
-  // constant = l-1, l is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
-  cst = isl_constraint_set_constant_si(cst, 1);
+  // constant += l-1, l is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
+  isl_val * c_val = isl_constraint_get_constant_val(cst);
+  int c_num = isl_val_get_num_si(c_val);
+  isl_val_free(c_val);
+  cst = isl_constraint_set_constant_si(cst, c_num + L_delay -1 );
   isl_constraint_dump(cst);
   isl_set * cst_ub = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));
 
@@ -170,8 +173,11 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   // affine: sink-source = distance
   diff = isl_aff_sub(isl_aff_copy(aff), isl_aff_copy(args->src));
   cst = isl_inequality_from_aff(diff);
-  // constant = -1
-  cst = isl_constraint_set_constant_si(cst, -1);
+  // constant += -1
+  c_val = isl_constraint_get_constant_val(cst);
+  c_num = isl_val_get_num_si(c_val);
+  isl_val_free(c_val);
+  cst = isl_constraint_set_constant_si(cst, c_num -1 );
   isl_constraint_dump(cst);  
   isl_set * cst_lb = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));  
 
@@ -184,7 +190,7 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   // ** check emptiness for whether further check parameters
 
   isl_set * empty;
-  bd = isl_set_partial_lexmin(bd, isl_set_copy(args->context), &empty);
+  bd = isl_set_partial_lexmax(bd, isl_set_copy(args->context), &empty);
   isl_set_dump(bd);
   isl_set_dump(empty);
 
@@ -297,12 +303,35 @@ isl_set * analyzeScop(pet_scop * scop){
   //analyze parameter range
   // S-Wr S-Rd
   //isl_map_dump(acc_rd[0].map);
-  isl_access_info * access = isl_access_info_alloc(isl_map_copy(acc_rd[0].map), &(acc_rd[0]), acc_order, 1);
-  access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
+  // isl_access_info * access = isl_access_info_alloc(isl_map_copy(acc_rd[0].map), &(acc_rd[0]), acc_order, 1);
+  // access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
 
-  isl_flow * flow = isl_access_info_compute_flow(access); 
+  // isl_flow * flow = isl_access_info_compute_flow(access); 
  
-  int s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
+  // int s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
+
+  // S-Wr S/M-Rd
+  isl_access_info * access;
+  isl_flow * flow;
+  int s3;
+  for(int i=0; i<stmt.n_acc_rd; i++){
+    // check name
+    if(strcmp(acc_rd[i].name, acc_wr[0].name) != 0){
+      continue;
+    }
+    std::cout << "***read access: "<< i << std::endl;
+    
+    // create access info for one read access (sink)
+    access = isl_access_info_alloc(isl_map_copy(acc_rd[i].map), &(acc_rd[i]), acc_order, 1);
+    // add write access (source)
+    access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
+    // compute flow
+    flow = isl_access_info_compute_flow(access); 
+    // analyze flow
+    s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
+    // free isl_flow
+    isl_flow_free(flow);
+  }
   
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
   // isl_map_dump(dep_non);
@@ -320,7 +349,7 @@ isl_set * analyzeScop(pet_scop * scop){
 
   isl_set_free(stmt.domain);
   isl_set_free(stmt.context);
-  isl_flow_free(flow);
+  //isl_flow_free(flow);
   //isl_set_dump(stmt.param);
   return stmt.param;
 

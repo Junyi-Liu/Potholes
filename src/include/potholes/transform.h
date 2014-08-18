@@ -50,15 +50,7 @@ namespace potholes {
 /*
  * SCoP Analysis 
  */
-struct aff_check_info {
-  
-  isl_aff * src;
-  isl_set * dom;
-  isl_set * ctx;
-  isl_set ** par;
-      
-};
-typedef struct aff_check_info aff_check_info;
+#define L_delay 2 // dummy statement delay
 
 struct acc_info {
   
