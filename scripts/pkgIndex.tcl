@@ -26,14 +26,15 @@ package ifneeded Potholes 1.0 [list apply {dir {
 	default {
 	    error "Error : Unsupported Platform"
 	}
-    }
-    
-    puts "ITCL checked"
+    }    
    
     uplevel 1 [list source [file join $dir preparePackage.tcl] ]
     get_platform_library_extension $dir 
     #uplevel 1 [list source [file join $dir loadPackage.tcl] ] 
     uplevel 1 [list source [file join $dir analysis.tcl] ]
     uplevel 1 [list source [file join $dir scop.tcl] ]
+
+    puts "before PROJECT setting"
+
     uplevel 1 [list source [file join $dir project.tcl] ]  
 }} $dir]
