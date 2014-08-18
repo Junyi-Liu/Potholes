@@ -161,7 +161,7 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   isl_aff * diff = isl_aff_sub(isl_aff_copy(args->src), isl_aff_copy(aff)); 
   isl_aff_dump(diff);
   isl_constraint * cst = isl_inequality_from_aff(diff); 
-  // constant += l-1, l is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
+  // constant += L-1, L is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
   isl_val * c_val = isl_constraint_get_constant_val(cst);
   int c_num = isl_val_get_num_si(c_val);
   isl_val_free(c_val);
@@ -188,13 +188,12 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   isl_set_dump(bd);
 
   // ** check emptiness for whether further check parameters
-
   isl_set * empty;
   bd = isl_set_partial_lexmax(bd, isl_set_copy(args->context), &empty);
   isl_set_dump(bd);
   isl_set_dump(empty);
 
-  if(!args->param){
+  if(args->param == NULL){
     args->param = isl_set_copy(empty);
   }
   else{
@@ -260,6 +259,7 @@ isl_set * analyzeScop(pet_scop * scop){
   stmt_info stmt;
   stmt.domain = isl_set_copy(scop->stmts[0]->domain);
   stmt.context = isl_set_copy(scop->context);
+  stmt.param = NULL;
   int s1 = pet_tree_foreach_access_expr(scop->stmts[0]->body, acc_expr_info, &stmt);  
   if (s1 == -1){
     isl_set_free(stmt.domain);
@@ -331,6 +331,7 @@ isl_set * analyzeScop(pet_scop * scop){
     s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
     // free isl_flow
     isl_flow_free(flow);
+    std::cout << "*** " << std::endl;
   }
   
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
