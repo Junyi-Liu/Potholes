@@ -42,11 +42,6 @@ set solution "ZynqSolution"
 
 puts "Solution: $solution"
 
-if { [string match "*vivado" [info nameofexecutable]] } {
-    puts "entering vivado hls"
-    exec /home/junyi/Xilinx/Vivado_HLS/2014.2/bin/vivado_hls -i
-}
-
 set project [Potholes::Project #auto $analysis $solution]
 
 $project compile

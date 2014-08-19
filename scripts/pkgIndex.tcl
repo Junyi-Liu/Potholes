@@ -5,7 +5,10 @@ proc get_platform_library_extension { dir } {
         load [file join $dir ../lib/libPotholes.dylib] 
     }
     Linux { 
-         load [file join $dir ../lib/libPotholes.so] 
+	if { ![string match "*vivado_hls" [info nameofexecutable]] } {
+	    load [file join $dir ../lib/libPotholes.so] 
+	}
+         #load [file join $dir ../lib/libPotholes.so] 
     }
     default {
     error "Error : Unsupported Platform"
