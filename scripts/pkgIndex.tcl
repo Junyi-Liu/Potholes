@@ -5,10 +5,7 @@ proc get_platform_library_extension { dir } {
         load [file join $dir ../lib/libPotholes.dylib] 
     }
     Linux { 
-	if { ![string match "*vivado_hls" [info nameofexecutable]] } {
-	    load [file join $dir ../lib/libPotholes.so] 
-	}
-         #load [file join $dir ../lib/libPotholes.so] 
+        load [file join $dir ../lib/libPotholes.so] 
     }
     default {
     error "Error : Unsupported Platform"
@@ -35,7 +32,7 @@ package ifneeded Potholes 1.0 [list apply {dir {
 
     get_platform_library_extension $dir 
 
-    puts "after PROJECT setting"
+    #puts "after PROJECT setting"
 
     #uplevel 1 [list source [file join $dir loadPackage.tcl] ] 
     uplevel 1 [list source [file join $dir analysis.tcl] ]
