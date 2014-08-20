@@ -175,22 +175,25 @@ void potholes::ExtractScop::operator() (std::string filename)
 
   isl_ctx * pet_ctx = build_options(pet_options_argc, pet_options_argv);
 
-  //check autodetect
+  // check autodetect
   printf( "autodetect is:");
   int detect = pet_options_get_autodetect(pet_ctx);
   printf( "%d\n", detect);
-  detect = pet_options_set_autodetect(pet_ctx, 1);
-  printf( "autodetect is:");
-  detect = pet_options_get_autodetect(pet_ctx);
-  printf( "%d\n", detect); 
+  // enable autodetect
+  // detect = pet_options_set_autodetect(pet_ctx, 1);
+  // printf( "autodetect is:");
+  // detect = pet_options_get_autodetect(pet_ctx);
+  // printf( "%d\n", detect); 
   
   pet_scop * scop;
   scop = pet_scop_extract_from_C_source(pet_ctx, filename.c_str(), NULL);
   if (scop) {
-    //std::cout << "Found Scop " << absolute_filename << "\n";
+    std::cout << "Found Scop " << absolute_filename << "\n";
     ScopPair pair(absolute_filename, new potholes::Scop(scop, filename));
     sm.insert(pair);
     // std::cout << "Insert : Map has " << sm.size() << "entries" << "\n";
   }
+
+  //isl_ctx_free(pet_ctx);
 }
   

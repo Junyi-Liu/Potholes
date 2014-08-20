@@ -1,4 +1,6 @@
 #include <potholes/transform.h>
+#include <potholes/affine.h>
+
 #include <iostream>
 
 #include </Users/Junyi/research/HLS/pet/expr.h>
@@ -88,8 +90,20 @@ int acc_expr_scan(pet_expr *expr, void *user){
   //std::cout << "acc_tuple_name: "<< acc->name << std::endl;
 
   //record array access map
+  // acc->map = isl_map_copy(map);
+  // isl_map_dump(acc->map);
+
+  // record array access map with flattern access pattern
+  isl_space * access_space = isl_map_get_space(map);
+  isl_id * id = isl_space_get_tuple_id(access_space, isl_dim_out);
+  isl_aff * aff = pth_flatten_expr_access(info->scop,  isl_map_copy(map),  isl_id_copy(id)); 
+  isl_map * amap = isl_map_from_pw_aff(isl_pw_aff_from_aff(aff));    
+  isl_map_dump(amap);
+  map = isl_map_apply_range(map, amap);
+  map = isl_map_set_tuple_id(map, isl_dim_out, id);
+  isl_map_dump(map);
   acc->map = isl_map_copy(map);
-  isl_map_dump(acc->map);
+
 
   //number of pt and it
   acc->n_pt = isl_map_n_param(map);
@@ -103,6 +117,7 @@ int acc_expr_scan(pet_expr *expr, void *user){
   // isl_space *p_space = pet_expr_access_get_data_space(pet_expr_copy(expr));
   // isl_space_dump(p_space);
   
+  isl_space_free(access_space);
   isl_map_free(map);
   isl_pw_aff_free(pwaff);
   return 0;
@@ -215,7 +230,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   //acc_info * acc_wr = (acc_info *)dep_user;
   stmt_info * stmt = (stmt_info *)user;
 
-  //std::cout << "DDDDDDDDD" << std::endl;
+  std::cout << "DDDDDDDDD" << std::endl;
   isl_map_dump(dep);
   
   //isl_set_dump(isl_map_domain(isl_map_copy(dep)));
@@ -226,6 +241,8 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   // statement domain
   isl_set_dump(stmt->domain);
 
+  //assert(false);
+
   // cycle delay constraint
   isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
   isl_local_space * lsp = isl_local_space_from_space(sp);
@@ -235,7 +252,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   // distance between source and sink
   int success = isl_pw_aff_foreach_piece(snk, check_aff_diff, stmt);
   
-  //std::cout << "DDDDDDDDD" << std::endl;
+  std::cout << "DDDDDDDDD" << std::endl;
 
   //isl_set_dump(stmt->param);
   isl_pw_aff_free(snk);
@@ -248,7 +265,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 /*
  * User defined Scop Modification
  */  
-isl_set * analyzeScop(pet_scop * scop){
+isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
  
   std::cout << "********Scop Analysis Start**********" << std::endl;
   pet_scop_dump(scop);
@@ -257,6 +274,7 @@ isl_set * analyzeScop(pet_scop * scop){
   // statement info
   // single statement for now!!!!!!!!!
   stmt_info stmt;
+  stmt.scop = scop;
   stmt.domain = isl_set_copy(scop->stmts[0]->domain);
   stmt.context = isl_set_copy(scop->context);
   stmt.param = NULL;
@@ -301,21 +319,12 @@ isl_set * analyzeScop(pet_scop * scop){
   } 
   
   //analyze parameter range
-  // S-Wr S-Rd
-  //isl_map_dump(acc_rd[0].map);
-  // isl_access_info * access = isl_access_info_alloc(isl_map_copy(acc_rd[0].map), &(acc_rd[0]), acc_order, 1);
-  // access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
-
-  // isl_flow * flow = isl_access_info_compute_flow(access); 
- 
-  // int s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
-
   // S-Wr S/M-Rd
   isl_access_info * access;
   isl_flow * flow;
   int s3;
   for(int i=0; i<stmt.n_acc_rd; i++){
-    // check name
+    // check name, only analysis array access with same name
     if(strcmp(acc_rd[i].name, acc_wr[0].name) != 0){
       continue;
     }
@@ -325,13 +334,14 @@ isl_set * analyzeScop(pet_scop * scop){
     access = isl_access_info_alloc(isl_map_copy(acc_rd[i].map), &(acc_rd[i]), acc_order, 1);
     // add write access (source)
     access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
+
     // compute flow
     flow = isl_access_info_compute_flow(access); 
     // analyze flow
     s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
     // free isl_flow
     isl_flow_free(flow);
-    std::cout << "*** " << std::endl;
+    std::cout << "*** " << s3 <<std::endl;
   }
   
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
@@ -339,11 +349,21 @@ isl_set * analyzeScop(pet_scop * scop){
   std::cout << "********Scop Analysis End*********" << std::endl; 
   
   for(int i=0; i<stmt.n_acc_wr; i++){
+    // record array name
+    if(vm->find(acc_wr[i].name) == vm->end()){
+      vm->insert(std::pair<std::string, std::string>(acc_wr[i].name, "int *"));
+    }
+    // clear isl related objects
     isl_map_free(acc_wr[i].map);
     isl_aff_free(acc_wr[i].aff);    
   }  
 
   for(int i=0; i<stmt.n_acc_rd; i++){
+    // record array name
+    if(vm->find(acc_rd[i].name) == vm->end()){
+      vm->insert(std::pair<std::string, std::string>(acc_rd[i].name, "int *"));
+    }
+    // clear isl related objects
     isl_map_free(acc_rd[i].map);
     isl_aff_free(acc_rd[i].aff);
   }
@@ -368,3 +388,12 @@ isl_set * analyzeScop(pet_scop * scop){
   // isl_pw_aff * pw_len = isl_pw_multi_aff_get_pw_aff(pwm_len, 0);
   // isl_pw_aff_dump(pw_len);
   //assert(false);
+
+  // S-Wr S-Rd
+  //isl_map_dump(acc_rd[0].map);
+  // isl_access_info * access = isl_access_info_alloc(isl_map_copy(acc_rd[0].map), &(acc_rd[0]), acc_order, 1);
+  // access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
+
+  // isl_flow * flow = isl_access_info_compute_flow(access); 
+ 
+  // int s3 = isl_flow_foreach(flow, dep_analysis, &stmt);

@@ -16,6 +16,7 @@
 #include <potholes/generate.h>
 
 #include <cassert>
+#include <cstring>
 
 struct pth_access_t {
 public:
@@ -831,13 +832,13 @@ typedef struct {
 isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr ) {   
 
   //Check arguments of access
-  pet_expr_dump(expr);  
+  //pet_expr_dump(expr);  
   std::cout<< "#####access args number: " << expr->n_arg << std::endl;
   
   // Put arguments into a list of isl_ast_expr
   isl_ast_expr * expr_list[expr->n_arg];
   for(int i=0; i < expr->n_arg ; i++){
-    pet_expr_dump(expr->args[i]);
+    //pet_expr_dump(expr->args[i]);
     expr_list[i] = pth_generate_ast_expr(build, scop, stmt, expr->args[i]);
     isl_ast_expr_dump(expr_list[i]);
   }
@@ -914,6 +915,12 @@ isl_ast_expr * pth_generate_wrapped_access_expr(pth_ast_build * build, pth_scop 
   pth_ast_build_with_isl_ast_expr_list args;
   args.build = build;
   args.scop = scop;
+
+  // Append "_flt" for the new array pointer for flattened access
+  std::string name(isl_space_get_tuple_name(access_space, isl_dim_out), strlen(isl_space_get_tuple_name(access_space, isl_dim_out)));
+  name.append("_flt");    
+  access_space = isl_space_set_tuple_name(access_space, isl_dim_out, name.c_str());
+
   args.tuple_id = isl_space_get_tuple_id(access_space, isl_dim_out);
   int success = isl_pw_multi_aff_foreach_piece(acc_pwma, pth_generate_v_ast, &args);
     
@@ -994,6 +1001,12 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
     pth_ast_build_with_isl_ast_expr_list args;
     args.build = build;
     args.scop = scop;
+    
+    // Append "_flt" for the new array pointer for flattened access
+    std::string name(isl_space_get_tuple_name(access_space, isl_dim_out), strlen(isl_space_get_tuple_name(access_space, isl_dim_out)));
+    name.append("_flt");    
+    access_space = isl_space_set_tuple_name(access_space, isl_dim_out, name.c_str());
+
     args.tuple_id = isl_space_get_tuple_id(access_space, isl_dim_out);
                 
     int success = isl_union_map_foreach_map(umap, pth_generate_access_map_expr_ast, &args);     

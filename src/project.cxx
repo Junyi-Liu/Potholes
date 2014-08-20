@@ -20,6 +20,7 @@ potholes::Project::Project(int val, const char * argv[]) {
   if (analysis) {
      
     callback = new potholes::RewriteCallback(rewriter, *analysis, std::cout);
+
     potholes::ConsumerFactory factory(rewriter, *analysis, *callback);
     clang::tooling::ClangTool * Tool = analysis->Tool;
 

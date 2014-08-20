@@ -80,6 +80,8 @@ struct acc_info {
 typedef struct acc_info acc_info;
 
 struct stmt_info{
+  
+  pet_scop * scop;
 
   isl_aff * src;
   
@@ -110,7 +112,7 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user);
 int dep_analysis(isl_map * dep, int must, void * dep_user, void * user);
 
 //User defined SCoP analysis
-isl_set * analyzeScop(pet_scop * scop); 
+isl_set * analyzeScop(pet_scop * scop, VarMap * vm); 
 
 
 

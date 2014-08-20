@@ -16,6 +16,7 @@
 
 isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr );
 
+isl_aff * pth_flatten_expr_access(pet_scop * scop , isl_map * access , isl_id * id );
 
 #ifdef	__cplusplus
 //}

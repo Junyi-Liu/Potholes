@@ -73,6 +73,7 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
   for (pit = paths.begin(); pit != paths.end(); pit++) {
     // std::cout << getAbsolutePath(*pit) << std::endl;
     potholes::Scop * scop = analysis.extractor.GetScop(getAbsolutePath(*pit));
+
     if (scop) {
       // pet_scop_dump(scop->scop);
 

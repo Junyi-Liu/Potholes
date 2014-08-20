@@ -70,7 +70,9 @@
 #include <potholes/isl_ast_build_expr.h>
 
 void pth_generate_initialize(isl_ctx * ctx) { 
-  pth_initialize_memory_space_id(ctx, "mem");
+  if(ctx){
+    pth_initialize_memory_space_id(ctx, "mem");
+  }
 }
 
 
@@ -825,7 +827,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   isl_ast_node_list * definitions_list = isl_ast_node_list_alloc(isl_set_get_ctx(scop->scop->context), scop->scop->n_array);
     
   std::stringstream ss;
-    
+
   // isl_printer * mprinter = pth_get_printer_from_scop(pscop);
     
   isl_union_map * schedule = pet_scop_collect_schedule(pscop);
@@ -846,7 +848,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
 
   // ** Analyze Scop HERE !!!!!!!!!!
-  isl_set * param = analyzeScop(pscop);
+  VarMap vm;
+  isl_set * param = analyzeScop(pscop, &vm);
   int sw;
   if(param == NULL || isl_set_is_empty(param)){
     // not able to apply transformation
@@ -854,6 +857,14 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   }
   else{
     sw = 1;
+  }
+
+  // turn multi-D pointer into 1D
+  VarMap::iterator argits = vm.begin();
+  while(argits != vm.end()) {
+    ss << argits->second << " " << argits->first << "_flt = &" << argits->first << ";\n";
+    argits++;
+    if (argits != vm.end()) ss << "," << "\n";
   }
 
   // ** Apply transformation HERE!!!!!!!!!!!!!!

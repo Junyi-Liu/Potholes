@@ -20,7 +20,7 @@ potholes::CompositeConsumer::CompositeConsumer(potholes::Analysis& analysis, pot
         
 void potholes::CompositeConsumer::Initialize(clang::ASTContext& Context) { 
   // Call the initialization for each transform
-        
+
   callback.setSourceMgr(Context.getSourceManager(), Context.getLangOpts());
             
   /*clang::SourceManager & sm = Context.getSourceManager();
