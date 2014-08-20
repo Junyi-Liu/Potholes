@@ -121,7 +121,7 @@ isl_aff * pth_create_flattening_aff(isl_set * bs,  unsigned size) {
 
 isl_aff * pth_flatten_expr_access(pet_scop * scop , isl_map * access , isl_id * id ) {
     
-  // isl_map_free(access);
+  isl_map_free(access);
 
   for (int i = 0 ; i < scop->n_array ; i++) {
     pet_array * array = scop->arrays[i];
@@ -134,14 +134,20 @@ isl_aff * pth_flatten_expr_access(pet_scop * scop , isl_map * access , isl_id * 
       if (isl_space_get_tuple_id(space, isl_dim_set) == id) { 
                 
 	isl_aff * flattening_aff = pth_create_flattening_aff(extent, array->element_size);
+
+	// extent free?
+	isl_space_free(space);
+	isl_id_free(id);
 	return flattening_aff;
              
       }
     }
-     
-        
+
+    isl_space_free(space);
+    isl_set_free(extent);
   }
-   
+
+  isl_id_free(id);
   return NULL;
 }
 

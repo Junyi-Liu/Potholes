@@ -59,8 +59,11 @@ struct acc_info {
   // line number
   //int line;
 
-  // map
+  // access pattern map
   isl_map * map;
+
+  // array flatten map
+  isl_map * fmap;
 
   // affine
   isl_aff * aff;
@@ -83,7 +86,7 @@ struct stmt_info{
   
   pet_scop * scop;
 
-  isl_aff * src;
+  isl_aff_list * src;
   
   isl_set * domain;
   isl_set * context;
@@ -97,6 +100,8 @@ struct stmt_info{
 
   /* int n_acc = 0; */
   /* acc_info *acc; */
+  
+  int rd_pos;
 
   int n_pt;
   int n_it;  

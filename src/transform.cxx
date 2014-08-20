@@ -5,6 +5,7 @@
 
 #include </Users/Junyi/research/HLS/pet/expr.h>
 
+#include <isl/ilp.h>
 #include <isl/flow.h>
 #include <isl/constraint.h>
 
@@ -90,19 +91,20 @@ int acc_expr_scan(pet_expr *expr, void *user){
   //std::cout << "acc_tuple_name: "<< acc->name << std::endl;
 
   //record array access map
-  // acc->map = isl_map_copy(map);
-  // isl_map_dump(acc->map);
+  acc->map = isl_map_copy(map);
+  isl_map_dump(acc->map);
 
   // record array access map with flattern access pattern
-  isl_space * access_space = isl_map_get_space(map);
-  isl_id * id = isl_space_get_tuple_id(access_space, isl_dim_out);
-  isl_aff * aff = pth_flatten_expr_access(info->scop,  isl_map_copy(map),  isl_id_copy(id)); 
-  isl_map * amap = isl_map_from_pw_aff(isl_pw_aff_from_aff(aff));    
-  isl_map_dump(amap);
-  map = isl_map_apply_range(map, amap);
-  map = isl_map_set_tuple_id(map, isl_dim_out, id);
-  isl_map_dump(map);
-  acc->map = isl_map_copy(map);
+  // isl_space * access_space = isl_map_get_space(map);
+  // isl_id * id = isl_space_get_tuple_id(access_space, isl_dim_out);
+  // isl_aff * aff = pth_flatten_expr_access(info->scop,  isl_map_copy(map),  isl_id_copy(id)); 
+  // isl_map * amap = isl_map_from_pw_aff(isl_pw_aff_from_aff(aff));    
+  // isl_map_dump(amap);
+  // acc->fmap = isl_map_copy(amap);  
+  // map = isl_map_apply_range(map, amap);
+  // map = isl_map_set_tuple_id(map, isl_dim_out, id);
+  // isl_map_dump(map);
+  // acc->map = isl_map_copy(map);
 
 
   //number of pt and it
@@ -117,7 +119,7 @@ int acc_expr_scan(pet_expr *expr, void *user){
   // isl_space *p_space = pet_expr_access_get_data_space(pet_expr_copy(expr));
   // isl_space_dump(p_space);
   
-  isl_space_free(access_space);
+  //isl_space_free(access_space);
   isl_map_free(map);
   isl_pw_aff_free(pwaff);
   return 0;
@@ -164,8 +166,7 @@ int acc_order(void * first, void * second){
   return 2*(acc_1->n_it)+1;
 }
 
-
-
+/*
 // check affine difference
 int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   
@@ -223,6 +224,114 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
   isl_aff_free(aff);
   return 0;
 }
+*/
+
+
+// get the size of the dimention of a given isl_set
+isl_val * get_dim_size(__isl_keep isl_set * set, unsigned dim)
+{
+ 
+  isl_set * bounded_set = isl_set_project_out(isl_set_copy(set), isl_dim_set, dim-1, 1);
+  isl_set_dump(bounded_set);
+  isl_space * bounded_space = isl_set_get_space(bounded_set);
+  isl_aff * aff = isl_aff_zero_on_domain(isl_local_space_from_space(bounded_space));
+
+  aff = isl_aff_set_coefficient_si(aff, isl_dim_in, 0, 1);   
+  isl_aff_dump(aff);
+
+  isl_val * max = isl_set_max_val(bounded_set, aff);
+  isl_val * min = isl_set_min_val(bounded_set, aff);  
+  max = isl_val_sub(max,min);
+
+  isl_aff_free(aff);
+  return isl_val_add_ui(max, 1); //max-min+1
+}
+
+// check multi-affine difference
+int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
+
+  stmt_info * stmt = (stmt_info *)user;
+
+  // (src-snk) in multi-afffine
+  for(int i=0; i<stmt->n_it; i++){
+    isl_aff * snk_aff = isl_multi_aff_get_aff(maff, i);
+    isl_aff * src_aff = isl_aff_list_get_aff(stmt->src, i);
+    snk_aff = isl_aff_sub(src_aff, snk_aff);
+    maff = isl_multi_aff_set_aff(maff, i, snk_aff);
+  }
+  isl_multi_aff_dump(maff);
+
+  // flatten (src-snk)
+  isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  isl_local_space * lsp = isl_local_space_from_space(sp);
+  isl_ctx * ctx = isl_local_space_get_ctx(lsp);
+  isl_val * ftr = isl_val_one(ctx);
+  isl_aff * diff = isl_aff_zero_on_domain(isl_local_space_copy(lsp));
+  for(int i=stmt->n_it-1; i>=0; i--){
+    // add dimension item with factor
+    isl_aff * dim = isl_multi_aff_get_aff(maff, i);
+    dim = isl_aff_scale_val(dim, isl_val_copy(ftr));
+    diff = isl_aff_add(diff, dim);
+    // scale up factor
+    if(i>0){
+      ftr = isl_val_mul(ftr, get_dim_size(stmt->domain, i));
+      //isl_val_dump(ftr);
+    }
+  }
+  isl_aff_dump(diff);
+  
+  // src-snk + L-1 >=0
+  isl_constraint * cst = isl_inequality_from_aff(isl_aff_copy(diff)); 
+  // constant += L-1, L is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
+  isl_val * c_val = isl_constraint_get_constant_val(cst);
+  int c_num = isl_val_get_num_si(c_val);
+  isl_val_free(c_val);
+  cst = isl_constraint_set_constant_si(cst, c_num + L_delay -1 );
+  isl_constraint_dump(cst);
+  isl_set * cst_ub = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));
+
+  // snk-src -1 >=0
+  // affine: sink-source = distance
+  diff = isl_aff_sub(isl_aff_zero_on_domain(lsp), diff); //0 - (src-snk)
+  cst = isl_inequality_from_aff(diff);
+  // constant += -1
+  c_val = isl_constraint_get_constant_val(cst);
+  c_num = isl_val_get_num_si(c_val);
+  isl_val_free(c_val);
+  cst = isl_constraint_set_constant_si(cst, c_num -1 );
+  isl_constraint_dump(cst);  
+  isl_set * cst_lb = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));    
+
+  // intersect lower and upper bounds
+  isl_set * bd = isl_set_intersect(cst_lb, cst_ub);
+  isl_set_dump(bd);
+  bd = isl_set_intersect(isl_set_copy(stmt->domain), bd);
+  isl_set_dump(bd);
+
+  // ** check emptiness for whether further check parameters
+  isl_set * empty;
+  bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);
+  isl_set_dump(bd);
+  isl_set_dump(empty);
+
+  if(stmt->param == NULL){
+    stmt->param = isl_set_copy(empty);
+  }
+  else{
+    stmt->param = isl_set_intersect(stmt->param,isl_set_copy(empty));
+  }
+  //stmt->param = isl_set_params(*empty);
+
+  assert(false);
+
+  //isl_set_dump(stmt->param); 
+  isl_set_free(empty);
+  isl_set_free(bd);
+  isl_val_free(ftr);  
+  isl_ctx_free(ctx);
+  isl_set_free(set);
+  return 0;
+}
 
 // Dependency analysis Func
 int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
@@ -232,31 +341,42 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 
   std::cout << "DDDDDDDDD" << std::endl;
   isl_map_dump(dep);
-  
-  //isl_set_dump(isl_map_domain(isl_map_copy(dep)));
-  isl_pw_multi_aff * pwm_aff = isl_pw_multi_aff_from_map(dep);
-  isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
-  isl_pw_aff_dump(snk);
+
+  // sink affine
+  isl_pw_multi_aff * snk = isl_pw_multi_aff_from_map(dep);
+  //isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
+  isl_pw_multi_aff_dump(snk);
+  //isl_pw_multi_aff_free(pwm_aff);
 
   // statement domain
   isl_set_dump(stmt->domain);
 
-  //assert(false);
-
-  // cycle delay constraint
+  // source affine
   isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
   isl_local_space * lsp = isl_local_space_from_space(sp);
-  stmt->src = isl_aff_var_on_domain(lsp, isl_dim_set, 0);
-  isl_aff_dump(stmt->src);
+  stmt->src = isl_aff_list_alloc(isl_local_space_get_ctx(lsp), 0);
+  for(int i = 0; i< isl_local_space_dim(lsp, isl_dim_set); i++){
+    stmt->src = isl_aff_list_add(stmt->src, isl_aff_var_on_domain(isl_local_space_copy(lsp), isl_dim_set, i));
+  }
+  isl_local_space_free(lsp);
+  isl_aff_list_dump(stmt->src);
+
+  //assert(false);
+
+  // source affine
+  // isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  // isl_local_space * lsp = isl_local_space_from_space(sp);
+  // stmt->src = isl_aff_var_on_domain(lsp, isl_dim_set, 0);
+  // isl_aff_dump(stmt->src);
 
   // distance between source and sink
-  int success = isl_pw_aff_foreach_piece(snk, check_aff_diff, stmt);
+  int success = isl_pw_multi_aff_foreach_piece(snk, check_multi_aff_diff, stmt);
   
   std::cout << "DDDDDDDDD" << std::endl;
 
   //isl_set_dump(stmt->param);
-  isl_pw_aff_free(snk);
-  isl_aff_free(stmt->src);
+  isl_pw_multi_aff_free(snk);
+  isl_aff_list_free(stmt->src);
   return 0;
 
 }
@@ -329,7 +449,10 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
       continue;
     }
     std::cout << "***read access: "<< i << std::endl;
-    
+
+    // record which read access
+    stmt.rd_pos = i;
+
     // create access info for one read access (sink)
     access = isl_access_info_alloc(isl_map_copy(acc_rd[i].map), &(acc_rd[i]), acc_order, 1);
     // add write access (source)
@@ -355,6 +478,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     }
     // clear isl related objects
     isl_map_free(acc_wr[i].map);
+    isl_map_free(acc_wr[i].fmap);
     isl_aff_free(acc_wr[i].aff);    
   }  
 
@@ -363,8 +487,9 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     if(vm->find(acc_rd[i].name) == vm->end()){
       vm->insert(std::pair<std::string, std::string>(acc_rd[i].name, "int *"));
     }
-    // clear isl related objects
+    // clear isl related object
     isl_map_free(acc_rd[i].map);
+    isl_map_free(acc_rd[i].fmap);
     isl_aff_free(acc_rd[i].aff);
   }
 
