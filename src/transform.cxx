@@ -320,6 +320,10 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
 
   // statement info
   // single statement for now!!!!!!!!!
+  if(isl_set_is_empty(scop->stmts[0]->domain)){
+    std::cout << "Empty Scop Domain, Check the correctness of the original code" << std::endl;   
+    assert(false);
+  }
   stmt_info stmt;
   stmt.scop = scop;
   stmt.domain = isl_set_copy(scop->stmts[0]->domain);
