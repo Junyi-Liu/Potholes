@@ -157,8 +157,9 @@ int acc_order(void * first, void * second){
 isl_val * get_dim_size(__isl_keep isl_set * set, unsigned dim)
 {
  
-  isl_set * bounded_set = isl_set_project_out(isl_set_copy(set), isl_dim_set, dim-1, 1);
+  isl_set * bounded_set = isl_set_project_out(isl_set_copy(set), isl_dim_set, 0, dim);
   isl_set_dump(bounded_set);
+
   isl_space * bounded_space = isl_set_get_space(bounded_set);
   isl_aff * aff = isl_aff_zero_on_domain(isl_local_space_from_space(bounded_space));
 
@@ -201,12 +202,12 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     // scale up factor
     if(i>0){
       ftr = isl_val_mul(ftr, get_dim_size(stmt->domain, i));
-      //isl_val_dump(ftr);
+      isl_val_dump(ftr);
     }
   }
   isl_aff_dump(diff);
   isl_val_free(ftr);  
-  isl_ctx_free(ctx);
+  //isl_ctx_free(ctx);
   
   // src-snk + L-1 >=0
   isl_constraint * cst = isl_inequality_from_aff(isl_aff_copy(diff)); 

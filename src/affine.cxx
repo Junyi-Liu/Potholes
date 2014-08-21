@@ -57,14 +57,11 @@ isl_val * pth_get_dim_size(isl_set * set, unsigned dim)
   //  isl_local_space * local_space = isl_local_space_from_space(space);
 
  
-  isl_set * bounded_set = isl_set_project_out(isl_set_copy(set), 
-					      isl_dim_set, 
-					      0, 1);
- 
+  isl_set * bounded_set = isl_set_project_out(isl_set_copy(set), isl_dim_set, 0, dim);
   
   isl_space * bounded_space = isl_set_get_space(bounded_set);
   isl_aff * aff = isl_aff_zero_on_domain(isl_local_space_from_space(bounded_space));
-  aff = isl_aff_set_coefficient_si(aff, isl_dim_in, dim, 1);
+  aff = isl_aff_set_coefficient_si(aff, isl_dim_in, 0, 1);
    
   isl_val * max = isl_set_max_val(bounded_set, aff);
   
@@ -109,7 +106,7 @@ isl_aff * pth_create_flattening_aff(isl_set * bs,  unsigned size) {
       affine_mapping =isl_aff_set_coefficient_val(affine_mapping, isl_dim_in, isl_local_space_dim(local_space, isl_dim_out) - i - 1, isl_val_copy(num));
               
       if ((i + 1) < isl_local_space_dim(local_space, isl_dim_out) ) {
-	num = isl_val_mul(num, pth_get_dim_size(bs, i)); 	
+	num = isl_val_mul(num, pth_get_dim_size(bs, isl_local_space_dim(local_space, isl_dim_out) - i - 1)); 	
       }
                 
     }
