@@ -858,8 +858,9 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   else{
     sw = 1;
   }
-
-  // turn multi-D pointer into 1D
+  
+  // turn multi-D pointer into 1D for SCoP generation
+  ss << "/* Begin Accelerated Scop */ \n";
   VarMap::iterator argits = vm.begin();
   while(argits != vm.end()) {
     ss << argits->second << " " << argits->first << "_flt = &" << argits->first << ";\n";
@@ -904,7 +905,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   isl_printer * printer = pth_get_pretty_printer_from_scop(pscop);
   printer = isl_ast_node_print(block, printer, options);
   
-  ss << "/* Begin Accelerated Scop */ \n";
+  // Print out generated codes
   ss << isl_printer_get_str(printer) << "\n";
   ss << "/* End Accelerated Scop */ \n";
 

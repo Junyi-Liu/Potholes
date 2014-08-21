@@ -62,9 +62,6 @@ struct acc_info {
   // access pattern map
   isl_map * map;
 
-  // array flatten map
-  isl_map * fmap;
-
   // affine
   isl_aff * aff;
 
