@@ -865,7 +865,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   while(argits != vm.end()) {
     ss << argits->second << " " << argits->first << "_flt = &" << argits->first << ";\n";
     argits++;
-    if (argits != vm.end()) ss << "," << "\n";
+    //if (argits != vm.end()) ss << "," << "\n";
   }
 
   // ** Apply transformation HERE!!!!!!!!!!!!!!

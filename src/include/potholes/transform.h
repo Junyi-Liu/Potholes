@@ -50,7 +50,7 @@ namespace potholes {
 /*
  * SCoP Analysis 
  */
-#define L_delay 2 // dummy statement delay
+#define L_delay 25 // dummy statement delay
 
 struct acc_info {
   

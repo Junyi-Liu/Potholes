@@ -239,10 +239,19 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   // ** check emptiness for whether further check parameters
   isl_set * empty;
-  bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);
-  isl_set_dump(bd);
-  isl_set_dump(empty);
+  if(isl_set_is_empty(bd)){
+    // when bd is already empty
+    empty = isl_set_copy(stmt->context);
+    isl_set_dump(empty);
+  }
+  else{
+    // when bd is determined to be empty
+    bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);
+    isl_set_dump(bd);
+    isl_set_dump(empty);
+  }
 
+  // add results
   if(stmt->param == NULL){
     stmt->param = isl_set_copy(empty);
   }
@@ -313,8 +322,8 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
  * User defined Scop Modification
  */  
 isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
- 
-  std::cout << "********Scop Analysis Start**********" << std::endl;
+
+  std::cout << "###########" << std::endl; 
   pet_scop_dump(scop);
   std::cout << "###########" << std::endl;
 
@@ -370,6 +379,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   } 
   
   //analyze parameter range
+  std::cout << "********Scop Analysis Start**********" << std::endl;
   // S-Wr S/M-Rd
   isl_access_info * access;
   isl_flow * flow;
