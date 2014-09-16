@@ -234,19 +234,24 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   // intersect lower and upper bounds
   isl_set * bd = isl_set_intersect(cst_lb, cst_ub);
   isl_set_dump(bd);
+  // intersect scop domain
   bd = isl_set_intersect(isl_set_copy(stmt->domain), bd);
   isl_set_dump(bd);
+
+  //isl_set_dump(stmt->context);
+  //assert(false);
 
   // ** check emptiness for whether further check parameters
   isl_set * empty;
   if(isl_set_is_empty(bd)){
     // when bd is already empty
-    empty = isl_set_copy(stmt->context);
+    empty = isl_set_universe(isl_set_get_space(stmt->context));
     isl_set_dump(empty);
   }
   else{
     // when bd is determined to be empty
-    bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);
+    //bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);  // consider parameter context from scop
+    bd = isl_set_partial_lexmax(bd, isl_set_universe(isl_set_get_space(stmt->context)), &empty);  // start from univaersal set
     isl_set_dump(bd);
     isl_set_dump(empty);
   }
@@ -422,6 +427,10 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     std::cout << "*** " << s3 <<std::endl;
   }
   
+  // Remove redundancies
+  stmt.param = isl_set_remove_redundancies(stmt.param);
+  //stmt.param = isl_set_detect_equalities(stmt.param);
+
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
   // isl_map_dump(dep_non);
   std::cout << "********Scop Analysis End*********" << std::endl; 
