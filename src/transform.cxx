@@ -1,7 +1,10 @@
 #include <potholes/transform.h>
 #include <potholes/affine.h>
 
+#include <string>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include </Users/Junyi/research/HLS/pet/expr.h>
 
@@ -247,7 +250,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   isl_val * c_val = isl_constraint_get_constant_val(cst);
   int c_num = isl_val_get_num_si(c_val);
   isl_val_free(c_val);
-  cst = isl_constraint_set_constant_si(cst, c_num + L_delay -1 );
+  cst = isl_constraint_set_constant_si(cst, c_num + stmt->L_delay -1 );
   isl_constraint_dump(cst);
   isl_set * cst_ub = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));
 
@@ -427,6 +430,20 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     return NULL;
   } 
   
+  // Read data file for statement delay infomation
+  std::string line;
+  std::ifstream datfile (delay_info_path);
+  if(datfile.is_open()){
+    getline(datfile, line);
+    std::cout<< "*** Reading info " << std::endl;
+    datfile.close();
+  }
+  else{
+    std::cout<< "*** Cannot read daley info file" << line << std::endl;
+    assert(false);
+  }
+  std::istringstream (line) >> stmt.L_delay;
+  std::cout<< "*** Delay info: " << stmt.L_delay << std::endl;
 
   // make domain always non-empty
   std::cout << "** Checking domain emptiness " << std::endl;  

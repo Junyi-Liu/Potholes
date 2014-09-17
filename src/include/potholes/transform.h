@@ -50,7 +50,8 @@ namespace potholes {
 /*
  * SCoP Analysis 
  */
-#define L_delay 25 // dummy statement delay
+//#define L_delay 25 // dummy statement delay
+#define delay_info_path "/Users/Junyi/research/HLS/application/vivado_play/loop_info/delay.dat"
 
 struct acc_info {
   
@@ -102,7 +103,10 @@ struct stmt_info{
 
   int n_pt;
   int n_it;  
-    
+
+  // delay info
+  int L_delay;    
+
 };
 typedef struct stmt_info stmt_info;
 
