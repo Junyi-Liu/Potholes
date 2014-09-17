@@ -153,25 +153,50 @@ int acc_order(void * first, void * second){
   return 2*(acc_1->n_it)+1;
 }
 
-// get the size of the dimention of a given isl_set
-isl_val * get_dim_size(__isl_keep isl_set * set, unsigned dim)
-{
- 
-  isl_set * bounded_set = isl_set_project_out(isl_set_copy(set), isl_dim_set, 0, dim);
-  isl_set_dump(bounded_set);
+// get affine+1 for get_dim_size
+int get_aff_plus_1(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user ){
 
-  isl_space * bounded_space = isl_set_get_space(bounded_set);
-  isl_aff * aff = isl_aff_zero_on_domain(isl_local_space_from_space(bounded_space));
-
-  aff = isl_aff_set_coefficient_si(aff, isl_dim_in, 0, 1);   
-  isl_aff_dump(aff);
-
-  isl_val * max = isl_set_max_val(bounded_set, aff);
-  isl_val * min = isl_set_min_val(bounded_set, aff);  
-  max = isl_val_sub(max,min);
+  isl_aff ** dist_aff = (isl_aff **)user;
+  
+  if( *dist_aff == NULL ){
+    *dist_aff = isl_aff_copy(aff);
+    isl_aff_dump(*dist_aff);
+  }
 
   isl_aff_free(aff);
-  return isl_val_add_ui(max, 1); //max-min+1
+  isl_set_free(set);
+  return 0;
+}
+
+// Get the size of the dimention of a given isl_set
+isl_aff * get_dim_size(__isl_keep isl_set * set, unsigned dim){
+
+  isl_pw_aff * max_pwaff = isl_set_dim_max(isl_set_copy(set), dim);
+  isl_pw_aff * min_pwaff = isl_set_dim_min(isl_set_copy(set), dim);
+  //isl_pw_aff_dump(max_pwaff);
+  //isl_pw_aff_dump(min_pwaff);
+  
+  isl_pw_aff * dist_pwaff = isl_pw_aff_sub(max_pwaff, min_pwaff);
+  isl_pw_aff_dump(dist_pwaff);
+
+  isl_aff * dist_aff = NULL;  
+  int success = isl_pw_aff_foreach_piece(dist_pwaff, get_aff_plus_1, &dist_aff);
+  isl_aff_dump(dist_aff);
+
+
+  isl_space * sp = isl_set_get_space(set);
+  isl_aff * rtn_aff = isl_aff_zero_on_domain(isl_local_space_from_space(sp));
+  
+  // copy distance affine to the proper domain space
+  rtn_aff = isl_aff_set_constant_val(rtn_aff, isl_aff_get_constant_val(dist_aff));
+  for(int i = 0; i< isl_aff_dim(rtn_aff, isl_dim_param); i++){
+    rtn_aff = isl_aff_set_coefficient_val(rtn_aff, isl_dim_param, i, isl_aff_get_coefficient_val(dist_aff, isl_dim_param, i));
+  }
+  isl_aff_dump(rtn_aff);
+
+  isl_pw_aff_free(dist_pwaff);
+  isl_aff_free(dist_aff);
+  return isl_aff_add_constant_si(rtn_aff, 1); //max-min+1
 }
 
 // check multi-affine difference
@@ -186,30 +211,37 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     snk_aff = isl_aff_sub(src_aff, snk_aff);
     maff = isl_multi_aff_set_aff(maff, i, snk_aff);
   }
+  std::cout << "* original (src-snk): "<< std::endl;
   isl_multi_aff_dump(maff);
 
   // flatten (src-snk)
+  std::cout << "** Flattening for (src-snk)" << std::endl;
   isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
   isl_local_space * lsp = isl_local_space_from_space(sp);
   isl_ctx * ctx = isl_local_space_get_ctx(lsp);
-  isl_val * ftr = isl_val_one(ctx);
+  isl_val * val_one = isl_val_one(ctx);
+  isl_aff * ftr = isl_aff_val_on_domain(isl_local_space_copy(lsp), val_one);
   isl_aff * diff = isl_aff_zero_on_domain(isl_local_space_copy(lsp));
   for(int i=stmt->n_it-1; i>=0; i--){
+    std::cout << "* dimension: "<< i << std::endl;
     // add dimension item with factor
     isl_aff * dim = isl_multi_aff_get_aff(maff, i);
-    dim = isl_aff_scale_val(dim, isl_val_copy(ftr));
+    dim = isl_aff_mul(dim, isl_aff_copy(ftr));
     diff = isl_aff_add(diff, dim);
     // scale up factor
+    // consider paramterized dim bounds
     if(i>0){
-      ftr = isl_val_mul(ftr, get_dim_size(stmt->domain, i));
-      isl_val_dump(ftr);
+      ftr = isl_aff_mul(ftr, get_dim_size(stmt->domain, i));
+      isl_aff_dump(ftr);
     }
   }
+  std::cout << "* flattened (src-snk): "<< std::endl;
   isl_aff_dump(diff);
-  isl_val_free(ftr);  
+  isl_aff_free(ftr);  
   //isl_ctx_free(ctx);
   
   // src-snk + L-1 >=0
+  std::cout << "** Creating: src-snk + L-1 >=0" << std::endl;
   isl_constraint * cst = isl_inequality_from_aff(isl_aff_copy(diff)); 
   // constant += L-1, L is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
   isl_val * c_val = isl_constraint_get_constant_val(cst);
@@ -221,6 +253,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   // snk-src -1 >=0
   // affine: sink-source = distance
+  std::cout << "** Creating: snk-src-1 >= 0" << std::endl;
   diff = isl_aff_sub(isl_aff_zero_on_domain(lsp), diff); //0 - (src-snk)
   cst = isl_inequality_from_aff(diff);
   // constant += -1
@@ -232,6 +265,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   isl_set * cst_lb = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));    
 
   // intersect lower and upper bounds
+  std::cout << "** Intersecting" << std::endl;
   isl_set * bd = isl_set_intersect(cst_lb, cst_ub);
   isl_set_dump(bd);
   // intersect scop domain
@@ -242,6 +276,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   //assert(false);
 
   // ** check emptiness for whether further check parameters
+  std::cout << "** Analyzing emptiness" << std::endl;
   isl_set * empty;
   if(isl_set_is_empty(bd)){
     // when bd is already empty
@@ -251,12 +286,13 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   else{
     // when bd is determined to be empty
     //bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);  // consider parameter context from scop
-    bd = isl_set_partial_lexmax(bd, isl_set_universe(isl_set_get_space(stmt->context)), &empty);  // start from univaersal set
+    bd = isl_set_partial_lexmax(bd, isl_set_universe(isl_set_get_space(stmt->context)), &empty);  // start from universal set
     isl_set_dump(bd);
     isl_set_dump(empty);
   }
 
   // add results
+  std::cout << "** Adding result" << std::endl;
   if(stmt->param == NULL){
     stmt->param = isl_set_copy(empty);
   }
@@ -267,7 +303,8 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   //assert(false);
 
-  //isl_set_dump(stmt->param); 
+  isl_set_dump(stmt->param); 
+
   isl_set_free(empty);
   isl_set_free(bd);
   isl_set_free(set);
@@ -283,17 +320,24 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   std::cout << "DDDDDDDDD" << std::endl;
   isl_map_dump(dep);
 
+  //dep = isl_map_coalesce(dep);  
+  // take lexmin for the case that map is not single-valued !!!!!!!
+  std::cout << "** Taking lexmin sink" << std::endl;
+  dep = isl_map_lexmin(dep);
+  isl_map_dump(dep);
+
   // sink affine
-  isl_pw_multi_aff * snk = isl_pw_multi_aff_from_map(dep);
+  isl_pw_multi_aff * snk = isl_pw_multi_aff_from_map(isl_map_copy(dep));
   //isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
   isl_pw_multi_aff_dump(snk);
   //isl_pw_multi_aff_free(pwm_aff);
 
   // statement domain
-  isl_set_dump(stmt->domain);
+  //isl_set_dump(stmt->domain);
 
   // source affine
-  isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  //isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  isl_space * sp = isl_set_get_space(isl_map_domain(dep));
   isl_local_space * lsp = isl_local_space_from_space(sp);
   stmt->src = isl_aff_list_alloc(isl_local_space_get_ctx(lsp), 0);
   for(int i = 0; i< isl_local_space_dim(lsp, isl_dim_set); i++){
@@ -383,6 +427,22 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     return NULL;
   } 
   
+
+  // make domain always non-empty
+  std::cout << "** Checking domain emptiness " << std::endl;  
+  isl_set * empty;
+  isl_set * dom_lexmax = isl_set_partial_lexmax(isl_set_copy(stmt.domain), isl_set_universe(isl_set_get_space(stmt.context)), &empty);  // start from universal set
+  if(isl_set_is_empty(empty) != 1){
+    std::cout << "** adding paramter constraints for non-empty domain" << std::endl;  
+    isl_set_dump(empty);
+    empty = isl_set_complement(empty);
+    isl_set_dump(empty);
+    stmt.param = isl_set_copy(empty);
+  }
+  isl_set_free(dom_lexmax);
+  isl_set_free(empty);  
+  //assert(false);
+
   //analyze parameter range
   std::cout << "********Scop Analysis Start**********" << std::endl;
   // S-Wr S/M-Rd
@@ -429,6 +489,8 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   
   // Remove redundancies
   stmt.param = isl_set_remove_redundancies(stmt.param);
+  // Coalescing
+  //stmt.param = isl_set_coalesce(stmt.param);
   //stmt.param = isl_set_detect_equalities(stmt.param);
 
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
