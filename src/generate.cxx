@@ -868,7 +868,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   ss << "/* Begin Accelerated Scop */ \n";
   VarMap::iterator argits = vm.begin();
   while(argits != vm.end()) {
-    ss << argits->second << " " << argits->first << "_flt = &" << argits->first << ";\n";
+    ss << argits->second << " " << argits->first << "_flt = " << argits->first << ";\n";
     argits++;
     //if (argits != vm.end()) ss << "," << "\n";
   }

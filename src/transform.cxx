@@ -513,22 +513,26 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
   // isl_map_dump(dep_non);
   std::cout << "********Scop Analysis End*********" << std::endl; 
-  
+
+  // Record array access name and type
+  for (int j = 0 ; j < scop->n_array  ; j++ ) {
+    pet_array * array = scop->arrays[j];
+    std::string element_type = array->element_type;
+    
+    std::string pname = isl_set_get_tuple_name(array->extent);
+    std::string ptype = element_type + std::string("*");
+    
+    vm->insert(std::pair<std::string, std::string>(pname, ptype));        
+  }
+
+  // Free isl objects
   for(int i=0; i<stmt.n_acc_wr; i++){
-    // record array name
-    if(vm->find(acc_wr[i].name) == vm->end()){
-      vm->insert(std::pair<std::string, std::string>(acc_wr[i].name, "int *"));
-    }
     // clear isl related objects
     isl_map_free(acc_wr[i].map);
     isl_aff_free(acc_wr[i].aff);    
   }  
 
   for(int i=0; i<stmt.n_acc_rd; i++){
-    // record array name
-    if(vm->find(acc_rd[i].name) == vm->end()){
-      vm->insert(std::pair<std::string, std::string>(acc_rd[i].name, "int *"));
-    }
     // clear isl related object
     isl_map_free(acc_rd[i].map);
     isl_aff_free(acc_rd[i].aff);
