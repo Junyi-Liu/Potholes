@@ -688,7 +688,12 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   pth_ast_expr * pth_expr = pth_ast_expr_from_isl_ast_expr(lhs_expr);
      
   printer = isl_printer_start_line(printer);
-           
+
+  printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
+  printer = isl_printer_end_line(printer);
+
+  printer = isl_printer_start_line(printer);
+
   if (pth_expr->type == isl_ast_expr_id) {
         
     pth_id_annotation * annotation = (pth_id_annotation *)isl_id_get_user(pth_array_offset_lookup(scop->array_offsets, pth_expr->u.id));
@@ -699,7 +704,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
       printer = isl_printer_print_str(printer, " ");
     } 
   }
-           
+  
   printer = isl_printer_print_ast_expr(printer, lhs_expr);
   assert(printer != NULL);
 
@@ -884,6 +889,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     // generate the whole ast node corresponding to the SCoP and added into one list  
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
+
     p_ast->u.i.then = isl_ast_node_copy(node);
     p_ast->u.i.else_node = isl_ast_node_copy(node); 
     definitions_list = isl_ast_node_list_add(definitions_list, p_ast);  
