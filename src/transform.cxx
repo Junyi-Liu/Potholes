@@ -446,6 +446,18 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     return NULL;
   } 
   
+  // Propose best initial interval considering 2 port per memory
+  int mem_port = 1;
+  for(int i=0; i<stmt.n_acc_rd; i++){
+    // only count read access with same name of write access
+    if(strcmp(acc_rd[i].name, acc_wr[0].name) == 0){
+      mem_port = mem_port + 1; 
+    }
+  }
+  std::cout<< "*** required memory port: " << mem_port << std::endl;
+  stmt.II = ceil(float(mem_port)/2);
+  std::cout<< "*** proposed best II: " << stmt.II << std::endl;
+
   // Read data file for statement delay infomation
   std::string line;
   std::ifstream datfile (delay_info_path);
@@ -460,6 +472,8 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   }
   std::istringstream (line) >> stmt.L_delay;
   std::cout<< "*** Delay info: " << stmt.L_delay << std::endl;
+  stmt.L_delay = ceil(float(stmt.L_delay)/float(stmt.II));
+  std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
 
   // make domain always non-empty
   std::cout << "** Checking domain emptiness " << std::endl;  

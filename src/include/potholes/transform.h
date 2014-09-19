@@ -106,6 +106,9 @@ struct stmt_info{
 
   // delay info
   int L_delay;    
+  
+  // best Initial Interval
+  int II;
 
 };
 typedef struct stmt_info stmt_info;
