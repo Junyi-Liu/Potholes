@@ -64,7 +64,7 @@ struct acc_info {
   isl_map * map;
 
   // affine
-  isl_aff * aff;
+  //isl_aff * aff;
 
   // parameters (uncertain variable)
   int n_pt;

@@ -26,8 +26,8 @@ int aff_scan(isl_set *set, isl_aff *aff, void *user){
   acc_info *info = (acc_info *) (user);  
   
   // affine
-  isl_aff_dump(aff);
-  info->aff = isl_aff_copy(aff); 
+  //isl_aff_dump(aff);
+  //info->aff = isl_aff_copy(aff); 
  
   isl_val * v;
 
@@ -103,6 +103,14 @@ int acc_expr_scan(pet_expr *expr, void *user){
 
   // assume just 1 target array access   
   isl_pw_aff * pwaff = isl_multi_pw_aff_get_pw_aff(expr->acc.index, 0);
+
+  // skip scalar write access
+  if((pet_expr_access_is_write(expr) == 1) && (pwaff == NULL)){
+    std::cout << "### skip analyzing the statement with scalar write access" << std::endl;
+    // isl_multi_pw_aff_dump(expr->acc.index);
+    isl_map_free(map);
+    return -1;
+  }
   
   int success = isl_pw_aff_foreach_piece(pwaff, aff_scan, acc);
   
@@ -126,7 +134,7 @@ int acc_expr_info(pet_expr *expr, void *user){
   }
 
   isl_map * map = pet_expr_access_get_access(expr);
-  
+
   if(isl_map_has_tuple_name(map, isl_dim_out) == 0){
     isl_map_free(map);
     std::cout << "###skip non-array access" << std::endl;
@@ -379,6 +387,14 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   pet_scop_dump(scop);
   std::cout << "###########" << std::endl;
 
+  // Record array access name and type
+  for (int j = 0 ; j < scop->n_array  ; j++ ) {
+    std::string element_type = scop->arrays[j]->element_type;    
+    std::string pname = isl_set_get_tuple_name(scop->arrays[j]->extent);
+    std::string ptype = element_type + std::string("*");   
+    vm->insert(std::pair<std::string, std::string>(pname, ptype));        
+  }
+
   // statement info
   // single statement for now!!!!!!!!!
   if(isl_set_is_empty(scop->stmts[0]->domain)){
@@ -514,25 +530,17 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   // isl_map_dump(dep_non);
   std::cout << "********Scop Analysis End*********" << std::endl; 
 
-  // Record array access name and type
-  for (int j = 0 ; j < scop->n_array  ; j++ ) {
-    std::string element_type = scop->arrays[j]->element_type;    
-    std::string pname = isl_set_get_tuple_name(scop->arrays[j]->extent);
-    std::string ptype = element_type + std::string("*");   
-    vm->insert(std::pair<std::string, std::string>(pname, ptype));        
-  }
-
   // Free isl objects
   for(int i=0; i<stmt.n_acc_wr; i++){
     // clear isl related objects
     isl_map_free(acc_wr[i].map);
-    isl_aff_free(acc_wr[i].aff);    
+    //isl_aff_free(acc_wr[i].aff);    
   }  
 
   for(int i=0; i<stmt.n_acc_rd; i++){
     // clear isl related object
     isl_map_free(acc_rd[i].map);
-    isl_aff_free(acc_rd[i].aff);
+    //isl_aff_free(acc_rd[i].aff);
   }
 
   isl_set_free(stmt.domain);

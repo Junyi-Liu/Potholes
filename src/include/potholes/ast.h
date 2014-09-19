@@ -81,7 +81,7 @@ struct pth_ast_stmt {
   pth_stmt_type type;
 
   // check wether printed for transformation
-  int t = 0;
+  int t;
     
   union { 
     struct { 
@@ -116,6 +116,7 @@ struct pth_scop {
   pth_array_offset_p array_offsets;
 
   VarMap * vm;
+  int t;
 };
 
 

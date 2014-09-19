@@ -647,7 +647,8 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
 
   int map_count = isl_union_map_n_map(pbuild->executed);
-    
+
+
   if (map_count == 1) {
     isl_id * tuple_id;
     int success = isl_union_map_foreach_map(pbuild->executed, extract_statement, &tuple_id);
@@ -655,7 +656,11 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
     // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);
-    stmt->t = 0;
+    if(scop->t == 1){
+      stmt->t = 1;
+    }else{
+      stmt->t = 0;
+    }
     
     // insert generated stmt in scop user pointer
     pth_scop_insert_stmt(scop, stmt);
@@ -695,9 +700,9 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   printer = isl_printer_end_line(printer);
 
   // add pragma for forcing pipelining
-  if(stmt->t == 0 ){
+  if(stmt->t == 1 ){
     std::cout << "adding pragma for transformation"<< std::endl;
-    stmt->t = 1;
+    stmt->t = 0;
 	
     VarMap::iterator argits = scop->vm->begin();
     while(argits != scop->vm->end()) {
@@ -711,7 +716,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
 	
   }
   else{
-    std::cout << "printing slow statement: "<< std::endl;
+    std::cout << "Printing slow statement "<< std::endl;
   }
 
 
@@ -883,9 +888,11 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   if(param == NULL || isl_set_is_empty(param)){
     // not able to apply transformation
     sw = 0;
+    scop->t = 0;
   }
   else{
     sw = 1;
+    scop->t = 1;
   }
   
   // turn multi-D pointer into 1D for SCoP generation
@@ -897,9 +904,11 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     //if (argits != vm.end()) ss << "," << "\n";
   }
 
+
   // ** Apply transformation HERE!!!!!!!!!!!!!!
   if(sw){
     std::cout << "\n***********Scop Transformation Start****************" << std::endl;
+
     // check universality at first !!!!!!!
     //isl_set_plain_is_universe(param)
     // isl_set_dump(param);
@@ -909,7 +918,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
     isl_ast_node_dump(p_ast);
 
-    std::cout << "***********Scop Transformation End****************\n" << std::endl; 
+    std::cout << "***********Scop Transformation End****************\n" << std::endl;     
+
     // generate the whole ast node corresponding to the SCoP and added into one list  
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
@@ -930,6 +940,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node_free(node);
   }
   else{
+    std::cout << "\n***********No transformation applied****************" << std::endl;
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     definitions_list = isl_ast_node_list_add(definitions_list, node); 
