@@ -23,6 +23,10 @@
 
 #include <pet.h>
 
+#include <vector>
+#include <map>
+#include <string>
+
 /* An expression is either an integer, an identifier or an operation
  * with zero or more arguments.
  */
@@ -72,17 +76,20 @@ typedef enum   {
 }  pth_stmt_type  ;
 
 struct pth_ast_stmt { 
-    /* Map of ids to ast expr */
-    isl_id * id;
-    pth_stmt_type type;
+  /* Map of ids to ast expr */
+  isl_id * id;
+  pth_stmt_type type;
+
+  // check wether printed for transformation
+  int t = 0;
     
-    union { 
-        struct { 
-       pth_ast_node * lhs;
-        pth_ast_node * rhs;
-        } assign ;
-        pth_ast_node * call;
-    } ;
+  union { 
+    struct { 
+      pth_ast_node * lhs;
+      pth_ast_node * rhs;
+    } assign ;
+    pth_ast_node * call;
+  } ;
 };
 
 pth_ast_stmt * pth_ast_stmt_alloc(pth_stmt_type);
@@ -97,11 +104,18 @@ pth_array_offset_p pth_array_offset_alloc();
 pth_array_offset_p pth_array_offset_insert(pth_array_offset_p list, pth_id * id, pth_id * offset_id);
 pth_id * pth_array_offset_lookup(pth_array_offset_p list, pth_id * id);
 
+
+typedef std::string TypeName;
+typedef std::string VarName;
+typedef std::map<VarName, TypeName> VarMap;
+
 struct pth_scop { 
-    pet_scop * scop;
-    unsigned n_stmt;
-    pth_ast_stmt ** stmts;
-    pth_array_offset_p array_offsets;
+  pet_scop * scop;
+  unsigned n_stmt;
+  pth_ast_stmt ** stmts;
+  pth_array_offset_p array_offsets;
+
+  VarMap * vm;
 };
 
 

@@ -655,6 +655,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
     // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);
+    stmt->t = 0;
     
     // insert generated stmt in scop user pointer
     pth_scop_insert_stmt(scop, stmt);
@@ -689,8 +690,30 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
      
   printer = isl_printer_start_line(printer);
 
+  // always try pipelining
   printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
   printer = isl_printer_end_line(printer);
+
+  // add pragma for forcing pipelining
+  if(stmt->t == 0 ){
+    std::cout << "adding pragma for transformation"<< std::endl;
+    stmt->t = 1;
+	
+    VarMap::iterator argits = scop->vm->begin();
+    while(argits != scop->vm->end()) {
+      std::stringstream ss;
+      ss << "#pragma HLS DEPENDENCE variable=" << argits->first << "_flt " << "array inter false";
+      printer = isl_printer_start_line(printer);
+      printer = isl_printer_print_str(printer, ss.str().c_str());
+      printer = isl_printer_end_line(printer);
+      argits++;
+    }	
+	
+  }
+  else{
+    std::cout << "printing slow statement: "<< std::endl;
+  }
+
 
   printer = isl_printer_start_line(printer);
 
@@ -736,7 +759,7 @@ isl_printer * pth_print_user_statement(isl_printer * printer, isl_ast_print_opti
     case pth_call_stmt : { 
       printer = pth_print_call_statement(printer, options, scop, stmt);
     } break;
-    case pth_assign_stmt : {
+    case pth_assign_stmt : {    
       printer = pth_print_assign_statement(printer, options,scop,  stmt);
     } break;
     default : assert(false);
@@ -855,6 +878,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // ** Analyze Scop HERE !!!!!!!!!!
   VarMap vm;
   isl_set * param = analyzeScop(pscop, &vm);
+  scop->vm = &vm;
   int sw;
   if(param == NULL || isl_set_is_empty(param)){
     // not able to apply transformation
@@ -890,8 +914,18 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
 
+    // std::string str = "fast";
+    // const char * loop_name = str.c_str();
+    // isl_ctx * ctx = isl_set_get_ctx(param);
+    // isl_id * loop_id = isl_id_alloc(ctx, loop_name, &vm);
+    // node = isl_ast_node_set_annotation(node, loop_id);
+    // isl_id_dump(isl_ast_node_get_annotation(node));
+
+    //assert(false);
+
     p_ast->u.i.then = isl_ast_node_copy(node);
     p_ast->u.i.else_node = isl_ast_node_copy(node); 
+    
     definitions_list = isl_ast_node_list_add(definitions_list, p_ast);  
     isl_ast_node_free(node);
   }

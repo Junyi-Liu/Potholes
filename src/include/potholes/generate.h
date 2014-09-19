@@ -31,12 +31,9 @@
 struct trans_info;
 typedef struct trans_info trans_info; 
 
-typedef std::string TypeName;
-typedef std::string VarName;
-typedef std::map<VarName, TypeName> VarMap;
-
-  
-
+/* typedef std::string TypeName; */
+/* typedef std::string VarName; */
+/* typedef std::map<VarName, TypeName> VarMap; */
   
 
 std::string pth_generate_scop_name(pet_scop * scop);

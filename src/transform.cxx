@@ -516,12 +516,9 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
 
   // Record array access name and type
   for (int j = 0 ; j < scop->n_array  ; j++ ) {
-    pet_array * array = scop->arrays[j];
-    std::string element_type = array->element_type;
-    
-    std::string pname = isl_set_get_tuple_name(array->extent);
-    std::string ptype = element_type + std::string("*");
-    
+    std::string element_type = scop->arrays[j]->element_type;    
+    std::string pname = isl_set_get_tuple_name(scop->arrays[j]->extent);
+    std::string ptype = element_type + std::string("*");   
     vm->insert(std::pair<std::string, std::string>(pname, ptype));        
   }
 
