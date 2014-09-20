@@ -39,3 +39,4 @@ set project [Potholes::Project #auto $analysis $solution]
 
 itcl::delete object $project
 itcl::delete object $analysis
+
