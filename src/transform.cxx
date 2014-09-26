@@ -19,58 +19,28 @@ potholes::Transform::Transform(Analysis& analysis) :analysis(analysis) {
               
 }
 
-
-// affine scan
-int aff_scan(isl_set *set, isl_aff *aff, void *user){
-  
-  acc_info *info = (acc_info *) (user);  
-  
-  // affine
-  //isl_aff_dump(aff);
-  //info->aff = isl_aff_copy(aff); 
- 
-  isl_val * v;
-
-  // parameters
-  int n_dim_p = isl_aff_dim(aff, isl_dim_param);
-  for(int i=0; i<n_dim_p ;i++){
-    v = isl_aff_get_coefficient_val(aff, isl_dim_param, i);
-    //isl_val_dump(v);
-    info->pt_coeff[i] = isl_val_get_num_si(v);
-    isl_val_free(v);
-  }
-  
-  // iterators
-  int n_dim_i = isl_aff_dim(aff, isl_dim_in);
-  for(int i=0; i<n_dim_i ;i++){
-    v = isl_aff_get_coefficient_val(aff, isl_dim_in, i);
-    //isl_val_dump(v);
-    info->it_coeff[i] = isl_val_get_num_si(v);
-    isl_val_free(v);    
-  }
-
-  // constant
-  v = isl_aff_get_constant_val(aff);
-  info->cnt = isl_val_get_num_si(v);
-  
-  isl_val_free(v);
-  isl_aff_free(aff);
-  isl_set_free(set);
-  return 0;
-}
-
-
-// memory access scan
+// Memory access scan for pattern details
 int acc_expr_scan(pet_expr *expr, void *user){
 
   stmt_info *info = (stmt_info *) (user);     
   
-  // wrapped access checked before
+  // wrapped access checked at first
   // skip non-array access
   isl_map * map = pet_expr_access_get_access(expr);  
   if(isl_map_has_tuple_name(map, isl_dim_out) == 0){
     isl_map_free(map);
     std::cout << "###skip non-array access" << std::endl;
+    return 0;
+  }
+
+  // assume just 1 target array access   
+  isl_pw_aff * pwaff = isl_multi_pw_aff_get_pw_aff(expr->acc.index, 0);
+
+  // Skip scalar write access
+  if((pet_expr_access_is_write(expr) == 1) && (pwaff == NULL)){
+    std::cout << "### skip analyzing scalar write access" << std::endl;
+    // isl_multi_pw_aff_dump(expr->acc.index);
+    isl_map_free(map);
     return 0;
   }
 
@@ -89,6 +59,9 @@ int acc_expr_scan(pet_expr *expr, void *user){
     info->n_acc_rd = info->n_acc_rd +1;
   }
 
+  //record statement index
+  acc->idx_stmt = info->idx;
+
   //record array name
   acc->name = isl_map_get_tuple_name(map, isl_dim_out);
   //std::cout << "acc_tuple_name: "<< acc->name << std::endl;
@@ -97,33 +70,19 @@ int acc_expr_scan(pet_expr *expr, void *user){
   acc->map = isl_map_copy(map);
   isl_map_dump(acc->map);
 
-  //number of pt and it
+  //record number of pt and it
   acc->n_pt = isl_map_n_param(map);
   acc->n_it = isl_map_n_in(map);
-
-  // assume just 1 target array access   
-  isl_pw_aff * pwaff = isl_multi_pw_aff_get_pw_aff(expr->acc.index, 0);
-
-  // skip scalar write access
-  if((pet_expr_access_is_write(expr) == 1) && (pwaff == NULL)){
-    std::cout << "### skip analyzing the statement with scalar write access" << std::endl;
-    // isl_multi_pw_aff_dump(expr->acc.index);
-    isl_map_free(map);
-    return -1;
-  }
   
-  int success = isl_pw_aff_foreach_piece(pwaff, aff_scan, acc);
+  //record access affine details
+  //int success = isl_pw_aff_foreach_piece(pwaff, aff_scan, acc);
   
-  // isl_space *p_space = pet_expr_access_get_data_space(pet_expr_copy(expr));
-  // isl_space_dump(p_space);
-  
-  //isl_space_free(access_space);
   isl_map_free(map);
   isl_pw_aff_free(pwaff);
   return 0;
 }
 
-// memory access info
+// Memory access info for counting
 int acc_expr_info(pet_expr *expr, void *user){
   
   stmt_info *info = (stmt_info *) (user);
@@ -141,6 +100,17 @@ int acc_expr_info(pet_expr *expr, void *user){
     return 0;
   }
   
+  // assume just 1 target array access   
+  isl_pw_aff * pwaff = isl_multi_pw_aff_get_pw_aff(expr->acc.index, 0);
+
+  // Skip scalar write access
+  if((pet_expr_access_is_write(expr) == 1) && (pwaff == NULL)){
+    std::cout << "### skip analyzing scalar write access" << std::endl;
+    // isl_multi_pw_aff_dump(expr->acc.index);
+    isl_map_free(map);
+    return 0;
+  }
+
   info->n_pt = isl_map_n_param(map);
   info->n_it = isl_map_n_in(map);
   
@@ -152,6 +122,7 @@ int acc_expr_info(pet_expr *expr, void *user){
   }
 
   isl_map_free(map);
+  isl_pw_aff_free(pwaff);
   return 0;
 }
 
@@ -227,7 +198,8 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   // flatten (src-snk)
   std::cout << "** Flattening for (src-snk)" << std::endl;
-  isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  // isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  isl_space * sp = isl_multi_aff_get_domain_space(maff);
   isl_local_space * lsp = isl_local_space_from_space(sp);
   isl_ctx * ctx = isl_local_space_get_ctx(lsp);
   isl_val * val_one = isl_val_one(ctx);
@@ -238,7 +210,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     // add dimension item with factor
     isl_aff * dim = isl_multi_aff_get_aff(maff, i);
     dim = isl_aff_mul(dim, isl_aff_copy(ftr));
-    diff = isl_aff_add(diff, dim);
+    diff = isl_aff_add(diff, dim);    
     // scale up factor
     // consider paramterized dim bounds
     if(i>0){
@@ -333,7 +305,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 
   //dep = isl_map_coalesce(dep);  
   // take lexmin for the case that map is not single-valued !!!!!!!
-  std::cout << "** Taking lexmin sink" << std::endl;
+  std::cout << "** Taking Lexmin sink" << std::endl;
   dep = isl_map_lexmin(dep);
   isl_map_dump(dep);
 
@@ -395,63 +367,77 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     vm->insert(std::pair<std::string, std::string>(pname, ptype));        
   }
 
-  // statement info
-  // single statement for now!!!!!!!!!
+  // Statements info
+  // Scan all statments
   if(isl_set_is_empty(scop->stmts[0]->domain)){
     std::cout << "Empty Scop Domain, Check the correctness of the original code" << std::endl;   
     assert(false);
   }
+  int n_stmt = scop->n_stmt;
+  std::cout << "*** Number of statments in the loop: "<< n_stmt << std::endl; 
   stmt_info stmt;
-  stmt.scop = scop;
-  stmt.domain = isl_set_copy(scop->stmts[0]->domain);
+  stmt.scop = scop;  
   stmt.context = isl_set_copy(scop->context);
   stmt.param = NULL;
-  int s1 = pet_tree_foreach_access_expr(scop->stmts[0]->body, acc_expr_info, &stmt);  
-  if (s1 == -1){
-    isl_set_free(stmt.domain);
-    isl_set_free(stmt.context);
-    return NULL;
+
+
+  // Counting the number of Rd & Wr array accesses respectively 
+  for(int i = 0; i<n_stmt; i++){
+    int s1 = pet_tree_foreach_access_expr(scop->stmts[i]->body, acc_expr_info, &stmt);  
+    if (s1 == -1){
+      isl_set_free(stmt.context);
+      return NULL;
+    }
   }
   
   // isl_map_dump(scop->stmts[0]->schedule);
 
-  // set up write containers
+  // Set up write containers
   acc_info acc_wr[stmt.n_acc_wr];
-  int pt_coeff_wr[stmt.n_acc_wr][stmt.n_pt];
-  int it_coeff_wr[stmt.n_acc_wr][stmt.n_it];
-  for(int i=0; i<stmt.n_acc_wr; i++){
-    acc_wr[i].pt_coeff = &pt_coeff_wr[i][0];
-    acc_wr[i].it_coeff = &it_coeff_wr[i][0];    
-  }  
   stmt.acc_wr = acc_wr;
+  // int pt_coeff_wr[stmt.n_acc_wr][stmt.n_pt];
+  // int it_coeff_wr[stmt.n_acc_wr][stmt.n_it];
+  // for(int i=0; i<stmt.n_acc_wr; i++){
+  //   acc_wr[i].pt_coeff = &pt_coeff_wr[i][0];
+  //   acc_wr[i].it_coeff = &it_coeff_wr[i][0];    
+  // }  
 
-  // set up read containers
+  // Set up read containers
   acc_info acc_rd[stmt.n_acc_rd];
-  int pt_coeff_rd[stmt.n_acc_rd][stmt.n_pt];
-  int it_coeff_rd[stmt.n_acc_rd][stmt.n_it];
-  for(int i=0; i<stmt.n_acc_rd; i++){
-    acc_rd[i].pt_coeff = &pt_coeff_rd[i][0];
-    acc_rd[i].it_coeff = &it_coeff_rd[i][0];
-  }  
   stmt.acc_rd = acc_rd;
+  // int pt_coeff_rd[stmt.n_acc_rd][stmt.n_pt];
+  // int it_coeff_rd[stmt.n_acc_rd][stmt.n_it];
+  // for(int i=0; i<stmt.n_acc_rd; i++){
+  //   acc_rd[i].pt_coeff = &pt_coeff_rd[i][0];
+  //   acc_rd[i].it_coeff = &it_coeff_rd[i][0];
+  // }  
+
  
-  // scan expression
+  // Scan detail access patterns
   stmt.n_acc_wr = 0;
   stmt.n_acc_rd = 0;
-  int s2 = pet_tree_foreach_access_expr(scop->stmts[0]->body, acc_expr_scan, &stmt);
+  for(int i = 0; i<n_stmt; i++){
+    stmt.idx = i;
+    int s2 = pet_tree_foreach_access_expr(scop->stmts[i]->body, acc_expr_scan, &stmt);
+    if (s2 == -1){
+      isl_set_free(stmt.context);
+      return NULL;
+    } 
+  }
 
-  if (s2 == -1){
-    isl_set_free(stmt.domain);
-    isl_set_free(stmt.context);
-    return NULL;
-  } 
-  
   // Propose best initial interval considering 2 port per memory
+  // just consider the array with write access !!!!!!!
   int mem_port = 1;
-  for(int i=0; i<stmt.n_acc_rd; i++){
-    // only count read access with same name of write access
-    if(strcmp(acc_rd[i].name, acc_wr[0].name) == 0){
-      mem_port = mem_port + 1; 
+  for(int j=0; j<stmt.n_acc_wr; j++){
+    int tmp_port = 1;
+    for(int i=0; i<stmt.n_acc_rd; i++){
+      // only count read access with same name of write access
+      if(strcmp(acc_rd[i].name, acc_wr[j].name) == 0){
+	tmp_port = tmp_port + 1; 
+      }
+    }
+    if(tmp_port > mem_port){
+      mem_port = tmp_port;
     }
   }
   std::cout<< "*** required memory port: " << mem_port << std::endl;
@@ -475,8 +461,9 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   stmt.L_delay = ceil(float(stmt.L_delay)/float(stmt.II));
   std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
 
-  // make domain always non-empty
-  std::cout << "** Checking domain emptiness " << std::endl;  
+  // Make domain always non-empty
+  std::cout << "** Checking domain emptiness " << std::endl; 
+  stmt.domain = isl_set_copy(scop->stmts[0]->domain);
   isl_set * empty;
   isl_set * dom_lexmax = isl_set_partial_lexmax(isl_set_copy(stmt.domain), isl_set_universe(isl_set_get_space(stmt.context)), &empty);  // start from universal set
   if(isl_set_is_empty(empty) != 1){
@@ -490,48 +477,60 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   isl_set_free(empty);  
   //assert(false);
 
-  //analyze parameter range
+  // Analyze parameter range
   std::cout << "********Scop Analysis Start**********" << std::endl;
-  // S-Wr S/M-Rd
+  // S/M-Wr S/M-Rd
+  // Current: consider all Wr-Rd access pairs with same array name !!!!!!!!!
   isl_access_info * access;
   isl_flow * flow;
   int s3;
-  for(int i=0; i<stmt.n_acc_rd; i++){
-    // check name, only analysis array access with same name
-    if(strcmp(acc_rd[i].name, acc_wr[0].name) != 0){
-      continue;
-    }
-    std::cout << "***read access: "<< i << std::endl;
-
-    // record which read access
-    stmt.rd_pos = i;
-
-    // create access info for one read access (sink)
-    access = isl_access_info_alloc(isl_map_copy(acc_rd[i].map), &(acc_rd[i]), acc_order, 1);
-    // add write access (source)
-    access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
-
-    // compute flow
-    flow = isl_access_info_compute_flow(access); 
+  for(int j = 0; j<stmt.n_acc_wr; j++){
+    std::cout << "======= Start write access: "<< j << "========"<< std::endl;
     
-    // analyze flow
-    s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
+    // adjust corresponding domain
+    isl_set_free(stmt.domain);
+    stmt.domain = isl_set_copy(scop->stmts[acc_wr[j].idx_stmt]->domain);    
     
-    // check whether there is no_source relation
-    isl_map * no_src = isl_flow_get_no_source(flow, 1);
-    if(isl_map_is_empty(no_src) !=1){
-      if(stmt.param == NULL){
-	stmt.param = isl_set_universe(isl_set_get_space(stmt.context));
+    // analyze Wr-Rd pairs
+    for(int i=0; i<stmt.n_acc_rd; i++){
+      // check name, only analysis array access with same name !!!!!!!
+      if(strcmp(acc_rd[i].name, acc_wr[j].name) != 0){
+	continue;
       }
-      else{
-	stmt.param = isl_set_intersect(stmt.param, isl_set_universe(isl_set_get_space(stmt.context)));
-      }
-    }
-    isl_map_free(no_src);
+      std::cout << "***read access: "<< i << std::endl;
+
+      // record which read access
+      stmt.rd_pos = i;
+
+      // create access info for one read access (sink)
+      access = isl_access_info_alloc(isl_map_copy(acc_rd[i].map), &(acc_rd[i]), acc_order, 1);
+      // add write access (source)
+      access = isl_access_info_add_source(access, isl_map_copy(acc_wr[j].map), 1, &(acc_wr[j]));
+
+      // compute flow
+      flow = isl_access_info_compute_flow(access); 
     
-    // free isl_flow
-    isl_flow_free(flow);
-    std::cout << "*** " << s3 <<std::endl;
+      // analyze flow
+      s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
+    
+      // check whether there is no_source relation
+      isl_map * no_src = isl_flow_get_no_source(flow, 1);
+      if(isl_map_is_empty(no_src) !=1){
+	if(stmt.param == NULL){
+	  stmt.param = isl_set_universe(isl_set_get_space(stmt.context));
+	}
+	else{
+	  stmt.param = isl_set_intersect(stmt.param, isl_set_universe(isl_set_get_space(stmt.context)));
+	}
+      }
+      isl_map_free(no_src);
+    
+      // free isl_flow
+      isl_flow_free(flow);
+      std::cout << "*** " << s3 <<std::endl;
+    }
+
+    std::cout << "======= Finish Write access: "<< j << "========"<< std::endl;
   }
   
   // Remove redundancies
@@ -684,3 +683,42 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 
 */
 
+
+// Affine scan
+// int aff_scan(isl_set *set, isl_aff *aff, void *user){
+  
+//   acc_info *info = (acc_info *) (user);  
+  
+//   // affine
+//   //isl_aff_dump(aff);
+//   //info->aff = isl_aff_copy(aff); 
+ 
+//   isl_val * v;
+
+//   // parameters
+//   int n_dim_p = isl_aff_dim(aff, isl_dim_param);
+//   for(int i=0; i<n_dim_p ;i++){
+//     v = isl_aff_get_coefficient_val(aff, isl_dim_param, i);
+//     //isl_val_dump(v);
+//     info->pt_coeff[i] = isl_val_get_num_si(v);
+//     isl_val_free(v);
+//   }
+  
+//   // iterators
+//   int n_dim_i = isl_aff_dim(aff, isl_dim_in);
+//   for(int i=0; i<n_dim_i ;i++){
+//     v = isl_aff_get_coefficient_val(aff, isl_dim_in, i);
+//     //isl_val_dump(v);
+//     info->it_coeff[i] = isl_val_get_num_si(v);
+//     isl_val_free(v);    
+//   }
+
+//   // constant
+//   v = isl_aff_get_constant_val(aff);
+//   info->cnt = isl_val_get_num_si(v);
+  
+//   isl_val_free(v);
+//   isl_aff_free(aff);
+//   isl_set_free(set);
+//   return 0;
+// }

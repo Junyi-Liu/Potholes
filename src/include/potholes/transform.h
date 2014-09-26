@@ -55,10 +55,14 @@ namespace potholes {
 
 struct acc_info {
   
+  // array name
   const char * name;
 
   // line number
   //int line;
+
+  // mother statement index
+  int idx_stmt;
 
   // access pattern map
   isl_map * map;
@@ -68,14 +72,14 @@ struct acc_info {
 
   // parameters (uncertain variable)
   int n_pt;
-  int *pt_coeff;
+  //int *pt_coeff;
   
   // iterators
   int n_it;
-  int *it_coeff;
+  //int *it_coeff;
 
   // constant
-  int cnt;
+  //int cnt;
       
 };
 typedef struct acc_info acc_info;
@@ -85,9 +89,16 @@ struct stmt_info{
   pet_scop * scop;
 
   isl_aff_list * src;
-  
+
+  // current statement index
+  int idx;
+  // current statement domain
   isl_set * domain;
+  
+  // scop context
   isl_set * context;
+
+  // paramter range
   isl_set * param;
 
   // statement memeory access info

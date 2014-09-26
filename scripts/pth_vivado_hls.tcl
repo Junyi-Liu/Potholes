@@ -16,7 +16,7 @@ puts "The process pid = $process_pid"
 #after 10000
 after 1000
 
-set database "/Users/Junyi/research/HLS/application/benchmarks/compile_commands.json"
+set database "/Users/Junyi/research/HLS/application/pth_play/compile_commands.json"
 
 # construct analysis object
 set analysis [Potholes::Analysis #auto $database]
