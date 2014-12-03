@@ -131,8 +131,8 @@ int acc_order(void * first, void * second){
 
   acc_info * acc_1 = (acc_info *)first;
   
-  // set to always on same line
-  return 2*(acc_1->n_it)+1;
+  // on the same line, write is always after read
+  return 2*(acc_1->n_it);
 }
 
 // get affine+1 for get_dim_size
@@ -186,15 +186,22 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   stmt_info * stmt = (stmt_info *)user;
 
+  std::cout << "* current piece set: "<< std::endl;
+  isl_set_dump(set);
+  //assert(false);
+
   // (src-snk) in multi-afffine
   for(int i=0; i<stmt->n_it; i++){
     isl_aff * snk_aff = isl_multi_aff_get_aff(maff, i);
     isl_aff * src_aff = isl_aff_list_get_aff(stmt->src, i);
+    //isl_aff_dump(snk_aff);
     snk_aff = isl_aff_sub(src_aff, snk_aff);
     maff = isl_multi_aff_set_aff(maff, i, snk_aff);
   }
   std::cout << "* original (src-snk): "<< std::endl;
   isl_multi_aff_dump(maff);
+
+  //assert(false);
 
   // flatten (src-snk)
   std::cout << "** Flattening for (src-snk)" << std::endl;
@@ -248,13 +255,18 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   isl_set * cst_lb = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));    
 
   // intersect lower and upper bounds
-  std::cout << "** Intersecting" << std::endl;
+  std::cout << "** Intersecting lower&upper bounds with statement domain" << std::endl;
   isl_set * bd = isl_set_intersect(cst_lb, cst_ub);
   isl_set_dump(bd);
   // intersect scop domain
   bd = isl_set_intersect(isl_set_copy(stmt->domain), bd);
   isl_set_dump(bd);
-
+  
+  // intersect current piece set !!!!!!!!!!
+  std::cout << "** Intersecting current piece "<< std::endl;
+  bd = isl_set_intersect(set,bd);
+  isl_set_dump(bd);
+  
   //isl_set_dump(stmt->context);
   //assert(false);
 
@@ -290,7 +302,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   isl_set_free(empty);
   isl_set_free(bd);
-  isl_set_free(set);
+  //isl_set_free(set);
   return 0;
 }
 
@@ -317,7 +329,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 
   // statement domain
   //isl_set_dump(stmt->domain);
-
+    
   // source affine
   //isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
   isl_space * sp = isl_set_get_space(isl_map_domain(dep));
