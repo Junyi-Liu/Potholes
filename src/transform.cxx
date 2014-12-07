@@ -255,12 +255,13 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   isl_set * cst_lb = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));    
 
   // intersect lower and upper bounds
-  std::cout << "** Intersecting lower&upper bounds with statement domain" << std::endl;
+  std::cout << "** Intersecting lower&upper bounds" << std::endl;
   isl_set * bd = isl_set_intersect(cst_lb, cst_ub);
   isl_set_dump(bd);
+  
   // intersect scop domain
-  bd = isl_set_intersect(isl_set_copy(stmt->domain), bd);
-  isl_set_dump(bd);
+  //bd = isl_set_intersect(isl_set_copy(stmt->domain), bd);
+  //isl_set_dump(bd);
   
   // intersect current piece set !!!!!!!!!!
   std::cout << "** Intersecting current piece "<< std::endl;
@@ -312,16 +313,41 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   //acc_info * acc_wr = (acc_info *)dep_user;
   stmt_info * stmt = (stmt_info *)user;
 
-  std::cout << "DDDDDDDDD" << std::endl;
+  std::cout << "=== Start dependency flow analysis" << std::endl;
+  std::cout << "=== current dep map:" << std::endl;
   isl_map_dump(dep);
 
+  // intersect dep map range with stmt->domain !!!!!!!
+  isl_map * dep_min = isl_map_lexmin(isl_map_copy(dep));
+  //isl_map_dump(dep_min);
+  if(dep_min == NULL){
+    // for the case range can be any value. this case is not suitable for lexmin
+    std::cout << "=== intersect dep map range with stmt->domain for lexmin" << std::endl;
+    dep = isl_map_intersect_range(dep, isl_set_copy(stmt->domain));
+    isl_map_dump(dep);
+  }
+  else
+    isl_map_free(dep_min);
+
+  //assert(false);
+  
   //dep = isl_map_coalesce(dep);  
   // take lexmin for the case that map is not single-valued !!!!!!!
-  std::cout << "** Taking Lexmin sink" << std::endl;
+  std::cout << "=== Taking Lexmin sink" << std::endl;
   dep = isl_map_lexmin(dep);
   isl_map_dump(dep);
 
+  // Apply stmt->domain onto both dep domain and range !!!!!
+  std::cout << "=== Apply src bounds" << std::endl;
+  dep = isl_map_intersect_domain(dep, isl_set_copy(stmt->domain));
+  isl_map_dump(dep);
+  std::cout << "=== Apply snk bounds" << std::endl;
+  dep = isl_map_intersect_range(dep, isl_set_copy(stmt->domain));
+  isl_map_dump(dep);
+  //assert(false);
+  
   // sink affine
+  std::cout << "=== Extract affine" << std::endl;
   isl_pw_multi_aff * snk = isl_pw_multi_aff_from_map(isl_map_copy(dep));
   //isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
   isl_pw_multi_aff_dump(snk);
@@ -350,9 +376,10 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   // isl_aff_dump(stmt->src);
 
   // distance between source and sink
+  std::cout << "=== Analyze dependency distance" << std::endl;
   int success = isl_pw_multi_aff_foreach_piece(snk, check_multi_aff_diff, stmt);
   
-  std::cout << "DDDDDDDDD" << std::endl;
+  std::cout << "=== Finish dependency flow analysis" << std::endl;
 
   //isl_set_dump(stmt->param);
   isl_pw_multi_aff_free(snk);
@@ -479,11 +506,12 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   isl_set * empty;
   isl_set * dom_lexmax = isl_set_partial_lexmax(isl_set_copy(stmt.domain), isl_set_universe(isl_set_get_space(stmt.context)), &empty);  // start from universal set
   if(isl_set_is_empty(empty) != 1){
-    std::cout << "** adding paramter constraints for non-empty domain" << std::endl;  
+    std::cout << "** exist paramter constraints for empty domain" << std::endl;  
     isl_set_dump(empty);
-    empty = isl_set_complement(empty);
-    isl_set_dump(empty);
-    stmt.param = isl_set_copy(empty);
+    //empty = isl_set_complement(empty);
+    //isl_set_dump(empty);
+    // add constraints of non-empty domain
+    //stmt.param = isl_set_copy(empty);
   }
   isl_set_free(dom_lexmax);
   isl_set_free(empty);  
@@ -544,11 +572,23 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
 
     std::cout << "======= Finish Write access: "<< j << "========"<< std::endl;
   }
+
+  // try to remove the constraints for invalid loop bounds
+  // if(isl_set_is_empty(empty) != 1){
+  //   std::cout << "** adding paramter constraints for non-empty domain" << std::endl;  
+  //   stmt.param = isl_set_intersect(stmt.param, isl_set_complement(isl_set_copy(empty)));
+  //   isl_set_dump(stmt.param);
+  // }
+  // isl_set_free(empty);
   
   // Remove redundancies
+  std::cout << "* Remove redundancies of param" << std::endl; 
   stmt.param = isl_set_remove_redundancies(stmt.param);
+  isl_set_dump(stmt.param);
   // Coalescing
-  //stmt.param = isl_set_coalesce(stmt.param);
+  std::cout << "* Coalescing param " << std::endl;   
+  stmt.param = isl_set_coalesce(stmt.param);
+  isl_set_dump(stmt.param);
   //stmt.param = isl_set_detect_equalities(stmt.param);
 
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
@@ -567,7 +607,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     isl_map_free(acc_rd[i].map);
     //isl_aff_free(acc_rd[i].aff);
   }
-
+  
   isl_set_free(stmt.domain);
   isl_set_free(stmt.context);
   //isl_flow_free(flow);
