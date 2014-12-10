@@ -186,7 +186,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   stmt_info * stmt = (stmt_info *)user;
 
-  std::cout << "* current piece set: "<< std::endl;
+  std::cout << "=== current piece set: "<< std::endl;
   isl_set_dump(set);
   //assert(false);
 
@@ -293,6 +293,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     stmt->param = isl_set_copy(empty);
   }
   else{
+    // set_intersect for difference pieces(conditions), since current piece's safe range contains other piece's conflict range
     stmt->param = isl_set_intersect(stmt->param,isl_set_copy(empty));
   }
   //stmt->param = isl_set_params(*empty);
@@ -317,26 +318,8 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   std::cout << "=== current dep map:" << std::endl;
   isl_map_dump(dep);
 
-  // intersect dep map range with stmt->domain !!!!!!!
-  isl_map * dep_min = isl_map_lexmin(isl_map_copy(dep));
-  //isl_map_dump(dep_min);
-  if(dep_min == NULL){
-    // for the case range can be any value. this case is not suitable for lexmin
-    std::cout << "=== intersect dep map range with stmt->domain for lexmin" << std::endl;
-    dep = isl_map_intersect_range(dep, isl_set_copy(stmt->domain));
-    isl_map_dump(dep);
-  }
-  else
-    isl_map_free(dep_min);
-
   //assert(false);
   
-  //dep = isl_map_coalesce(dep);  
-  // take lexmin for the case that map is not single-valued !!!!!!!
-  std::cout << "=== Taking Lexmin sink" << std::endl;
-  dep = isl_map_lexmin(dep);
-  isl_map_dump(dep);
-
   // Apply stmt->domain onto both dep domain and range !!!!!
   std::cout << "=== Apply src bounds" << std::endl;
   dep = isl_map_intersect_domain(dep, isl_set_copy(stmt->domain));
@@ -345,6 +328,13 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   dep = isl_map_intersect_range(dep, isl_set_copy(stmt->domain));
   isl_map_dump(dep);
   //assert(false);
+
+  //dep = isl_map_coalesce(dep);
+  
+  // take lexmin for the case that map is not single-valued !!!!!!!
+  std::cout << "=== Taking Lexmin sink" << std::endl;
+  dep = isl_map_lexmin(dep);
+  isl_map_dump(dep);  
   
   // sink affine
   std::cout << "=== Extract affine" << std::endl;
