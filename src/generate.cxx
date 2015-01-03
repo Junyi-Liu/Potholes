@@ -65,6 +65,8 @@
 #include <isl/schedule.h>
 #include <isl/flow.h>
 
+#include <isl/union_set.h>
+
 #include </Users/Junyi/research/HLS/pet/isl/isl_ast_private.h>
 #include </Users/Junyi/research/HLS/pet/isl/isl_ast_build_private.h>
 #include <potholes/isl_ast_build_expr.h>
@@ -656,10 +658,17 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
     // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);
+    // add control for print transformation pragma
     if(scop->t == 1){
       stmt->t = 1;
-    }else{
+      scop->t = 2;
+    }
+    else if(scop->t == 0){
       stmt->t = 0;
+      scop->t = 2;      
+    }
+    else{
+      stmt->t = 2;
     }
     
     // insert generated stmt in scop user pointer
@@ -691,19 +700,18 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
     
   isl_ast_expr * lhs_expr = isl_ast_node_user_get_expr(pth_ast_node_to_isl_ast_node(stmt->assign.lhs));
     
-  pth_ast_expr * pth_expr = pth_ast_expr_from_isl_ast_expr(lhs_expr);
-     
-  printer = isl_printer_start_line(printer);
-
-  // always try pipelining
-  printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
-  printer = isl_printer_end_line(printer);
+  pth_ast_expr * pth_expr = pth_ast_expr_from_isl_ast_expr(lhs_expr);     
 
   // add pragma for forcing pipelining
   if(stmt->t == 1 ){
-    std::cout << "adding pragma for transformation"<< std::endl;
-    stmt->t = 0;
-	
+    std::cout << "printing pragma for transformation"<< std::endl;
+    stmt->t = 0; // assign 0 for slow part
+
+    // always try pipelining
+    printer = isl_printer_start_line(printer);
+    printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
+    printer = isl_printer_end_line(printer);
+    
     VarMap::iterator argits = scop->vm->begin();
     while(argits != scop->vm->end()) {
       std::stringstream ss;
@@ -715,10 +723,15 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
     }	
 	
   }
-  else{
-    std::cout << "Printing slow statement "<< std::endl;
+  else if(stmt->t == 0){
+    std::cout << "printing pragma for slow loop"<< std::endl;
+    // always try pipelining
+    printer = isl_printer_start_line(printer);    
+    printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
+    printer = isl_printer_end_line(printer);    
   }
 
+  std::cout << "Printing loop statements "<< std::endl;
 
   printer = isl_printer_start_line(printer);
 
@@ -865,13 +878,16 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     
   isl_union_map * schedule = pet_scop_collect_schedule(pscop);
   isl_union_set * domain = pet_scop_collect_domains(pscop);
-    
+  
   // mprinter = isl_printer_print_union_set(mprinter, domain);
-  schedule = isl_union_map_intersect_domain(schedule, domain);           
+  schedule = isl_union_map_intersect_domain(schedule, domain);
   
   // create isl_ast: build and print_options
   isl_ast_print_options * options = isl_ast_print_options_alloc(pth_get_ctx_from_scop(pscop));
   isl_ast_build * build = isl_ast_build_from_context(pscop->context);
+
+  //  isl_union_set_dump(domain);
+  //assert(false);
 
   // set to print user statements (create_leaf_user of isl_ast_build)
   options = isl_ast_print_options_set_print_user(options, pth_print_user_statement, scop);

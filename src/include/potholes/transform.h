@@ -92,8 +92,10 @@ struct stmt_info{
 
   // current statement index
   int idx;
-  // current statement domain
+  // current src statement domain
   isl_set * domain;
+  // current snk statement domain
+  isl_set * dom_snk;
   
   // scop context
   isl_set * context;

@@ -325,7 +325,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   dep = isl_map_intersect_domain(dep, isl_set_copy(stmt->domain));
   isl_map_dump(dep);
   std::cout << "=== Apply snk bounds" << std::endl;
-  dep = isl_map_intersect_range(dep, isl_set_copy(stmt->domain));
+  dep = isl_map_intersect_range(dep, isl_set_copy(stmt->dom_snk));
   isl_map_dump(dep);
   //assert(false);
 
@@ -491,20 +491,20 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
 
   // Make domain always non-empty
-  std::cout << "** Checking domain emptiness " << std::endl; 
-  stmt.domain = isl_set_copy(scop->stmts[0]->domain);
-  isl_set * empty;
-  isl_set * dom_lexmax = isl_set_partial_lexmax(isl_set_copy(stmt.domain), isl_set_universe(isl_set_get_space(stmt.context)), &empty);  // start from universal set
-  if(isl_set_is_empty(empty) != 1){
-    std::cout << "** exist paramter constraints for empty domain" << std::endl;  
-    isl_set_dump(empty);
-    //empty = isl_set_complement(empty);
-    //isl_set_dump(empty);
-    // add constraints of non-empty domain
-    //stmt.param = isl_set_copy(empty);
-  }
-  isl_set_free(dom_lexmax);
-  isl_set_free(empty);  
+  // std::cout << "** Checking domain emptiness " << std::endl; 
+  // stmt.domain = isl_set_copy(scop->stmts[0]->domain);
+  // isl_set * empty;
+  // isl_set * dom_lexmax = isl_set_partial_lexmax(isl_set_copy(stmt.domain), isl_set_universe(isl_set_get_space(stmt.context)), &empty);  // start from universal set
+  // if(isl_set_is_empty(empty) != 1){
+  //   std::cout << "** exist paramter constraints for empty domain" << std::endl;  
+  //   isl_set_dump(empty);
+  //   //empty = isl_set_complement(empty);
+  //   //isl_set_dump(empty);
+  //   // add constraints of non-empty domain
+  //   //stmt.param = isl_set_copy(empty);
+  // }
+  // isl_set_free(dom_lexmax);
+  // isl_set_free(empty);  
   //assert(false);
 
   // Analyze parameter range
@@ -517,8 +517,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
   for(int j = 0; j<stmt.n_acc_wr; j++){
     std::cout << "======= Start write access: "<< j << "========"<< std::endl;
     
-    // adjust corresponding domain
-    isl_set_free(stmt.domain);
+    // assign corresponding write access domain
     stmt.domain = isl_set_copy(scop->stmts[acc_wr[j].idx_stmt]->domain);    
     
     // analyze Wr-Rd pairs
@@ -529,6 +528,9 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
       }
       std::cout << "***read access: "<< i << std::endl;
 
+      // assign corresponding read access domain
+      stmt.dom_snk = isl_set_copy(scop->stmts[acc_rd[i].idx_stmt]->domain);
+      
       // record which read access
       stmt.rd_pos = i;
 
@@ -557,9 +559,14 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     
       // free isl_flow
       isl_flow_free(flow);
+      // free current snk domain
+      isl_set_free(stmt.dom_snk);
       std::cout << "*** " << s3 <<std::endl;
     }
 
+    // free current write access domain
+    isl_set_free(stmt.domain);
+    
     std::cout << "======= Finish Write access: "<< j << "========"<< std::endl;
   }
 
@@ -598,7 +605,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
     //isl_aff_free(acc_rd[i].aff);
   }
   
-  isl_set_free(stmt.domain);
+  //isl_set_free(stmt.domain);
   isl_set_free(stmt.context);
   //isl_flow_free(flow);
   //isl_set_dump(stmt.param);
