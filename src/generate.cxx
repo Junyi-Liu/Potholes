@@ -906,7 +906,13 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     sw = 0;
     scop->t = 0;
   }
+  else if(isl_set_plain_is_universe(param)){
+    // always in safe range, add pragma for fast pipeline
+    sw = 0;
+    scop->t = 1;
+  }
   else{
+    // apply safe range and add pragma
     sw = 1;
     scop->t = 1;
   }
