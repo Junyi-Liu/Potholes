@@ -897,8 +897,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
 
   // ** Analyze Scop HERE !!!!!!!!!!
-  VarMap vm;
-  isl_set * param = analyzeScop(pscop, &vm);
+  VarMap vm, tm;
+  isl_set * param = analyzeScop(pscop, &vm, &tm);
   scop->vm = &vm;
   int sw;
   if(param == NULL || isl_set_is_empty(param)){
@@ -920,9 +920,11 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // turn multi-D pointer into 1D for SCoP generation
   ss << "/* Begin Accelerated Scop */ \n";
   VarMap::iterator argits = vm.begin();
+  VarMap::iterator its_tm = tm.begin();  
   while(argits != vm.end()) {
-    ss << argits->second << " " << argits->first << "_flt = " << argits->first << ";\n";
+    ss << argits->second << " " << argits->first << "_flt =" << its_tm->second  << argits->first << ";\n";
     argits++;
+    its_tm++;
     //if (argits != vm.end()) ss << "," << "\n";
   }
 
