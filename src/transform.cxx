@@ -391,12 +391,17 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
 
   // Record array access name and type
   for (int j = 0 ; j < scop->n_array  ; j++ ) {
-    std::string element_type = scop->arrays[j]->element_type;    
-    std::string pname = isl_set_get_tuple_name(scop->arrays[j]->extent);
-    std::string ptype = element_type + std::string("*");   
-    vm->insert(std::pair<std::string, std::string>(pname, ptype));        
+    //isl_set_dump(scop->arrays[j]->extent);
+    //std::cout << "dim_in: " << isl_set_dim(scop->arrays[j]->extent, isl_dim_set) << std::endl;
+    if(isl_set_dim(scop->arrays[j]->extent, isl_dim_set) > 0){
+      std::string element_type = scop->arrays[j]->element_type;    
+      std::string pname = isl_set_get_tuple_name(scop->arrays[j]->extent);   
+      std::string ptype = element_type + std::string("*");   
+      vm->insert(std::pair<std::string, std::string>(pname, ptype));
+    }
   }
-
+  //assert(false);
+  
   // Statements info
   // Scan all statments
   if(isl_set_is_empty(scop->stmts[0]->domain)){
