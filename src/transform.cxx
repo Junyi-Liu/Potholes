@@ -321,13 +321,13 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   //assert(false);
   
   // Apply stmt->domain onto both dep domain and range !!!!!
-  std::cout << "=== Apply src bounds" << std::endl;
-  dep = isl_map_intersect_domain(dep, isl_set_copy(stmt->domain));
-  isl_map_dump(dep);
-  std::cout << "=== Apply snk bounds" << std::endl;
-  dep = isl_map_intersect_range(dep, isl_set_copy(stmt->dom_snk));
-  isl_map_dump(dep);
-  //assert(false);
+  // std::cout << "=== Apply src bounds" << std::endl;
+  // dep = isl_map_intersect_domain(dep, isl_set_copy(stmt->domain));
+  // isl_map_dump(dep);
+  // std::cout << "=== Apply snk bounds" << std::endl;
+  // dep = isl_map_intersect_range(dep, isl_set_copy(stmt->dom_snk));
+  // isl_map_dump(dep);
+  // //assert(false);
 
   //dep = isl_map_coalesce(dep);
   
@@ -342,7 +342,8 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
   //isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
   isl_pw_multi_aff_dump(snk);
   //isl_pw_multi_aff_free(pwm_aff);
-
+  
+  
   // statement domain
   //isl_set_dump(stmt->domain);
     
@@ -534,14 +535,26 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm){
       // record which read access
       stmt.rd_pos = i;
 
+      // Apply statement domains onto both src and snk map !!!!!
+      std::cout << "=== Apply src bounds" << std::endl;
+      isl_map * src_map = isl_map_intersect_domain(isl_map_copy(acc_wr[j].map), isl_set_copy(stmt.domain));
+      isl_map_dump(src_map);
+      std::cout << "=== Apply snk bounds" << std::endl;
+      isl_map * snk_map = isl_map_intersect_domain(isl_map_copy(acc_rd[i].map), isl_set_copy(stmt.dom_snk));
+      isl_map_dump(snk_map);
+      
+      //assert(false);
+      
       // create access info for one read access (sink)
-      access = isl_access_info_alloc(isl_map_copy(acc_rd[i].map), &(acc_rd[i]), acc_order, 1);
+      access = isl_access_info_alloc(snk_map, &(acc_rd[i]), acc_order, 1);
       // add write access (source)
-      access = isl_access_info_add_source(access, isl_map_copy(acc_wr[j].map), 1, &(acc_wr[j]));
+      access = isl_access_info_add_source(access, src_map, 1, &(acc_wr[j]));
 
       // compute flow
+      std::cout << "** start computing flow" << std::endl;
       flow = isl_access_info_compute_flow(access); 
-    
+      std::cout << "** finish computing flow" << std::endl;
+      
       // analyze flow
       s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
     
