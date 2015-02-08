@@ -100,9 +100,12 @@ struct stmt_info{
   // scop context
   isl_set * context;
 
-  // paramter range
+  // current paramter safe region
   isl_set * param;
 
+  // current iteration conflict region
+  isl_set * cft;
+  
   // statement memeory access info
   int n_acc_wr = 0; 
   acc_info *acc_wr; 
@@ -126,6 +129,17 @@ struct stmt_info{
 };
 typedef struct stmt_info stmt_info;
 
+struct recur_info{
+
+  // paramter safe region
+  isl_set * param = NULL;
+  
+  // iteration conflict region
+  isl_set * cft = NULL;
+  
+};
+typedef struct recur_info recur_info;  
+
 int aff_scan(isl_set *set, isl_aff *aff, void *user);
 int acc_expr_scan(pet_expr *expr, void *user);
 int acc_expr_info(pet_expr *expr, void *user);
@@ -134,7 +148,7 @@ int check_aff_diff(isl_set * set, isl_aff * aff, void * user);
 int dep_analysis(isl_map * dep, int must, void * dep_user, void * user);
 
 //User defined SCoP analysis
-isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm); 
+void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt); 
 
 
 

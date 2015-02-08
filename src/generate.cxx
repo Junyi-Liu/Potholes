@@ -898,15 +898,36 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 
   // ** Analyze Scop HERE !!!!!!!!!!
   VarMap vm, tm;
-  isl_set * param = analyzeScop(pscop, &vm, &tm);
+  recur_info rlt;
+  analyzeScop(pscop, &vm, &tm, &rlt);
+  //isl_set * param = isl_set_copy(rlt.param);
+  //isl_set * cft = isl_set_copy(rlt.cft);
+
+  // PLAY with conflict region
+  std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;  
+  std::cout << "==== Conflict Region: " << std::endl; 
+  isl_set_dump(rlt.cft);
+  std::cout << "==== lexmin point: " << std::endl;   
+  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt.cft));
+  isl_set_dump(pnt_lexmin);
+  std::cout << "==== lexmax point: " << std::endl;     
+  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt.cft));
+  isl_set_dump(pnt_lexmax);
+  
+  isl_set_free(pnt_lexmin);
+  isl_set_free(pnt_lexmax);
+  isl_set_free(rlt.cft);
+  std::cout << "************* CONFLICT REGION LEXICO END *************\n" << std::endl;  
+  
+  // Control transformation
   scop->vm = &vm;
   int sw;
-  if(param == NULL || isl_set_is_empty(param)){
+  if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
     // not able to apply transformation
     sw = 0;
     scop->t = 0;
   }
-  else if(isl_set_plain_is_universe(param)){
+  else if(isl_set_plain_is_universe(rlt.param)){
     // always in safe range, add pragma for fast pipeline
     sw = 0;
     scop->t = 1;
@@ -936,7 +957,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     // check universality at first !!!!!!!
     //isl_set_plain_is_universe(param)
     // isl_set_dump(param);
-    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, isl_set_copy(param));
+    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, isl_set_copy(rlt.param));
     isl_ast_expr_dump(p_expr);
 
     isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
@@ -971,7 +992,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   }
 
   // clean param set!!!!!!
-  isl_set_free(param);
+  isl_set_free(rlt.param);
 
   // convert ast_node list into ast block node
   isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));

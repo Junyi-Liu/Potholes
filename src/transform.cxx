@@ -282,19 +282,25 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   else{
     // when bd is determined to be empty
     //bd = isl_set_partial_lexmax(bd, isl_set_copy(stmt->context), &empty);  // consider parameter context from scop
-    bd = isl_set_partial_lexmax(bd, isl_set_universe(isl_set_get_space(stmt->context)), &empty);  // start from universal set
-    isl_set_dump(bd);
+    isl_set * pnt_lex = isl_set_partial_lexmax(isl_set_copy(bd), isl_set_universe(isl_set_get_space(stmt->context)), &empty);  // start from universal set
+    
+    isl_set_dump(pnt_lex);
     isl_set_dump(empty);
+    
+    isl_set_free(pnt_lex);
+    //assert(false);
   }
 
   // add results
   std::cout << "** Adding result" << std::endl;
   if(stmt->param == NULL){
     stmt->param = isl_set_copy(empty);
+    stmt->cft = isl_set_copy(bd);
   }
   else{
     // set_intersect for difference pieces(conditions), since current piece's safe range contains other piece's conflict range
     stmt->param = isl_set_intersect(stmt->param,isl_set_copy(empty));
+    stmt->cft = isl_set_union(stmt->cft, isl_set_copy(bd));
   }
   //stmt->param = isl_set_params(*empty);
 
@@ -383,7 +389,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 /*
  * User defined Scop Modification
  */  
-isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm){
+void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
   std::cout << "###########" << std::endl; 
   pet_scop_dump(scop);
@@ -427,7 +433,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm){
     int s1 = pet_tree_foreach_access_expr(scop->stmts[i]->body, acc_expr_info, &stmt);  
     if (s1 == -1){
       isl_set_free(stmt.context);
-      return NULL;
+      return;
     }
   }
   
@@ -462,7 +468,7 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm){
     int s2 = pet_tree_foreach_access_expr(scop->stmts[i]->body, acc_expr_scan, &stmt);
     if (s2 == -1){
       isl_set_free(stmt.context);
-      return NULL;
+      return;
     } 
   }
 
@@ -530,7 +536,10 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm){
     std::cout << "======= Start write access: "<< j << "========"<< std::endl;
     
     // assign corresponding write access domain
-    stmt.domain = isl_set_copy(scop->stmts[acc_wr[j].idx_stmt]->domain);    
+    stmt.domain = isl_set_copy(scop->stmts[acc_wr[j].idx_stmt]->domain);
+
+    std::cout << "==== Schedule: " << std::endl;
+    isl_map_dump(scop->stmts[acc_wr[j].idx_stmt]->schedule);
     
     // analyze Wr-Rd pairs
     for(int i=0; i<stmt.n_acc_rd; i++){
@@ -606,16 +615,22 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm){
   std::cout << "* Remove redundancies of param" << std::endl; 
   stmt.param = isl_set_remove_redundancies(stmt.param);
   isl_set_dump(stmt.param);
+  stmt.cft = isl_set_remove_redundancies(stmt.cft);  
   // Coalescing
   std::cout << "* Coalescing param " << std::endl;   
   stmt.param = isl_set_coalesce(stmt.param);
   isl_set_dump(stmt.param);
+  stmt.cft = isl_set_coalesce(stmt.cft);  
   //stmt.param = isl_set_detect_equalities(stmt.param);
 
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
   // isl_map_dump(dep_non);
   std::cout << "********Scop Analysis End*********" << std::endl; 
 
+  // copy final results
+  rlt->param = isl_set_copy(stmt.param);
+  rlt->cft = isl_set_copy(stmt.cft);
+  
   // Free isl objects
   for(int i=0; i<stmt.n_acc_wr; i++){
     // clear isl related objects
@@ -633,7 +648,9 @@ isl_set * analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm){
   isl_set_free(stmt.context);
   //isl_flow_free(flow);
   //isl_set_dump(stmt.param);
-  return stmt.param;
+  isl_set_free(stmt.param);
+  isl_set_free(stmt.cft);
+  return;
 
 }
 
