@@ -535,7 +535,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   //assert(false);
 
   // Analyze parameter range
-  std::cout << "********Scop Analysis Start**********" << std::endl;
+  std::cout << "***************** SCOP ANALYSIS START *******************" << std::endl;
 
   // safe region start from universe set
   stmt.param = isl_set_universe(isl_set_get_space(stmt.context));
@@ -640,7 +640,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
   // isl_map * dep_non = isl_flow_get_no_source(flow, 1);
   // isl_map_dump(dep_non);
-  std::cout << "********Scop Analysis End*********" << std::endl; 
+  std::cout << "***************** SCOP ANALYSIS END *******************" << std::endl; 
 
   // copy final results
   rlt->param = isl_set_copy(stmt.param);

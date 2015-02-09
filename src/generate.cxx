@@ -954,7 +954,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 
   // ** Apply transformation HERE!!!!!!!!!!!!!!
   if(sw){
-    std::cout << "\n***********Scop Transformation Start****************" << std::endl;
+    std::cout << "\n*********** SCOP TRANSFORMATION START ****************" << std::endl;
 
     // check universality at first !!!!!!!
     //isl_set_plain_is_universe(param)
@@ -965,7 +965,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
     isl_ast_node_dump(p_ast);
 
-    std::cout << "***********Scop Transformation End****************\n" << std::endl;     
+    std::cout << "************* SCOP TRANSFORMATION END ****************\n" << std::endl;     
 
     // generate the whole ast node corresponding to the SCoP and added into one list  
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
@@ -987,7 +987,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node_free(node);
   }
   else{
-    std::cout << "\n***********No transformation applied****************" << std::endl;
+    std::cout << "\n*********** NO SCOP TRANSFORMATION APPLIED ****************" << std::endl;
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     definitions_list = isl_ast_node_list_add(definitions_list, node); 
