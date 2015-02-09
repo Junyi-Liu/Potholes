@@ -291,7 +291,10 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     //assert(false);
   }
 
-  // add results
+  // Add results
+  // remove statement id for stmt->cft
+  // when statement schedule dimension numbers are different ???????? 
+  bd = isl_set_reset_tuple_id(bd);
   std::cout << "** Adding result" << std::endl;
   if(stmt->param == NULL){
     stmt->param = isl_set_copy(empty);
