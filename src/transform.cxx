@@ -296,15 +296,22 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   // when statement schedule dimension numbers are different ???????? 
   bd = isl_set_reset_tuple_id(bd);
   std::cout << "** Adding result" << std::endl;
-  if(stmt->param == NULL){
-    stmt->param = isl_set_copy(empty);
-    stmt->cft = isl_set_copy(bd);
-  }
-  else{
+  // if(stmt->param == NULL){
+  //   stmt->param = isl_set_copy(empty);
+  //   stmt->cft = isl_set_copy(bd);
+  // }
+  // else{
+  //   // set_intersect for difference pieces(conditions), since current piece's safe range contains other piece's conflict range
+  //   stmt->param = isl_set_intersect(stmt->param,isl_set_copy(empty));
+  //   stmt->cft = isl_set_union(stmt->cft, isl_set_copy(bd));
+  // }
+
+  if(isl_set_is_empty(bd) != 1){
     // set_intersect for difference pieces(conditions), since current piece's safe range contains other piece's conflict range
     stmt->param = isl_set_intersect(stmt->param,isl_set_copy(empty));
     stmt->cft = isl_set_union(stmt->cft, isl_set_copy(bd));
   }
+  
   //stmt->param = isl_set_params(*empty);
 
   //assert(false);
@@ -430,7 +437,6 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   stmt.context = isl_set_copy(scop->context);
   stmt.param = NULL;
 
-
   // Counting the number of Rd & Wr array accesses respectively 
   for(int i = 0; i<n_stmt; i++){
     int s1 = pet_tree_foreach_access_expr(scop->stmts[i]->body, acc_expr_info, &stmt);  
@@ -530,6 +536,12 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
   // Analyze parameter range
   std::cout << "********Scop Analysis Start**********" << std::endl;
+
+  // safe region start from universe set
+  stmt.param = isl_set_universe(isl_set_get_space(stmt.context));
+  // conflict region start from empty set
+  stmt.cft = isl_set_empty(isl_set_get_space(stmt.context));
+  
   // S/M-Wr S/M-Rd
   // Current: consider all Wr-Rd access pairs with same array name !!!!!!!!!
   isl_access_info * access;
@@ -582,16 +594,16 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
       s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
     
       // check whether there is no_source relation
-      isl_map * no_src = isl_flow_get_no_source(flow, 1);
-      if(isl_map_is_empty(no_src) !=1){
-	if(stmt.param == NULL){
-	  stmt.param = isl_set_universe(isl_set_get_space(stmt.context));
-	}
-	else{
-	  stmt.param = isl_set_intersect(stmt.param, isl_set_universe(isl_set_get_space(stmt.context)));
-	}
-      }
-      isl_map_free(no_src);
+      // isl_map * no_src = isl_flow_get_no_source(flow, 1);
+      // if(isl_map_is_empty(no_src) !=1){
+      // 	if(stmt.param == NULL){
+      // 	  stmt.param = isl_set_universe(isl_set_get_space(stmt.context));
+      // 	}
+      // 	else{
+      // 	  stmt.param = isl_set_intersect(stmt.param, isl_set_universe(isl_set_get_space(stmt.context)));
+      // 	}
+      // }
+      // isl_map_free(no_src);
     
       // free isl_flow
       isl_flow_free(flow);

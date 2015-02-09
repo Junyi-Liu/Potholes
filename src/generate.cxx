@@ -917,7 +917,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   isl_set_free(pnt_lexmin);
   isl_set_free(pnt_lexmax);
   isl_set_free(rlt.cft);
-  std::cout << "************* CONFLICT REGION LEXICO END *************\n" << std::endl;  
+  std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;  
   
   // Control transformation
   scop->vm = &vm;
@@ -929,6 +929,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   }
   else if(isl_set_plain_is_universe(rlt.param)){
     // always in safe range, add pragma for fast pipeline
+    std::cout << "\n*********** ALWAYS IN SAFE REGION ****************" << std::endl;
+    std::cout << "Apply pragma for false inter-dependency " << std::endl;
     sw = 0;
     scop->t = 1;
   }
