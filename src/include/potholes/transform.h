@@ -150,6 +150,8 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user);
 //User defined SCoP analysis
 void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt); 
 
+//User defined SCoP Modification
+void splitLoop(pet_scop * scop, __isl_keep isl_set * cft);
 
 
 #endif	/* TRANSFORM_H */

@@ -397,7 +397,7 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 
 
 /*
- * User defined Scop Modification
+ * User defined Scop Analysis
  */  
 void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
@@ -669,125 +669,6 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
 }
 
-  // Failed Approach
-  // dep = isl_map_intersect_domain(dep, isl_set_copy(stmt->domain));
-  // int exact = 0;
-  // isl_map * len = isl_map_reaching_path_lengths(isl_map_copy(dep), &exact);
-  // std::cout << "exact: " << exact << std::endl;
-  // isl_map_dump(len);
-  // len = isl_map_lexmax(len);
-  // isl_map_dump(len);  
-  // isl_pw_multi_aff * pwm_len = isl_pw_multi_aff_from_map(len);
-  // isl_pw_aff * pw_len = isl_pw_multi_aff_get_pw_aff(pwm_len, 0);
-  // isl_pw_aff_dump(pw_len);
-  //assert(false);
-
-  // S-Wr S-Rd
-  //isl_map_dump(acc_rd[0].map);
-  // isl_access_info * access = isl_access_info_alloc(isl_map_copy(acc_rd[0].map), &(acc_rd[0]), acc_order, 1);
-  // access = isl_access_info_add_source(access, isl_map_copy(acc_wr[0].map), 1, &(acc_wr[0]));
-
-  // isl_flow * flow = isl_access_info_compute_flow(access); 
- 
-  // int s3 = isl_flow_foreach(flow, dep_analysis, &stmt);
-
-/*
-// check 1-D access affine difference
-int check_aff_diff(isl_set * set, isl_aff * aff, void * user){
-  
-  stmt_info * args = (stmt_info *)user;
-
-  // src-snk + L-1 >=0
-  // affine: source-sink = -distance
-  isl_aff * diff = isl_aff_sub(isl_aff_copy(args->src), isl_aff_copy(aff)); 
-  isl_aff_dump(diff);
-  isl_constraint * cst = isl_inequality_from_aff(diff); 
-  // constant += L-1, L is delay cycles, which is >=1 !!!!!!!!!!!!!!!!
-  isl_val * c_val = isl_constraint_get_constant_val(cst);
-  int c_num = isl_val_get_num_si(c_val);
-  isl_val_free(c_val);
-  cst = isl_constraint_set_constant_si(cst, c_num + L_delay -1 );
-  isl_constraint_dump(cst);
-  isl_set * cst_ub = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));
-
-  // snk-src -1 >=0
-  // affine: sink-source = distance
-  diff = isl_aff_sub(isl_aff_copy(aff), isl_aff_copy(args->src));
-  cst = isl_inequality_from_aff(diff);
-  // constant += -1
-  c_val = isl_constraint_get_constant_val(cst);
-  c_num = isl_val_get_num_si(c_val);
-  isl_val_free(c_val);
-  cst = isl_constraint_set_constant_si(cst, c_num -1 );
-  isl_constraint_dump(cst);  
-  isl_set * cst_lb = isl_set_from_basic_set(isl_basic_set_from_constraint(cst));  
-
-  // intersect lower and upper bounds
-  isl_set * bd = isl_set_intersect(cst_lb, cst_ub);
-  isl_set_dump(bd);
-  bd = isl_set_intersect(isl_set_copy(args->domain), bd);
-  isl_set_dump(bd);
-
-  // ** check emptiness for whether further check parameters
-  isl_set * empty;
-  bd = isl_set_partial_lexmax(bd, isl_set_copy(args->context), &empty);
-  isl_set_dump(bd);
-  isl_set_dump(empty);
-
-  if(args->param == NULL){
-    args->param = isl_set_copy(empty);
-  }
-  else{
-    args->param = isl_set_intersect(args->param,isl_set_copy(empty));
-  }
-  //args->param = isl_set_params(*empty);
-
-  //isl_set_dump(args->param); 
-  isl_set_free(empty);
-  isl_set_free(bd);
-  isl_set_free(set);
-  isl_aff_free(aff);
-  return 0;
-}
-
-// Dependency analysis Func for 1-D access
-int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
-  
-  //acc_info * acc_wr = (acc_info *)dep_user;
-  stmt_info * stmt = (stmt_info *)user;
-
-  std::cout << "DDDDDDDDD" << std::endl;
-  isl_map_dump(dep);
-
-  // sink affine
-  isl_pw_multi_aff * snk = isl_pw_multi_aff_from_map(dep);
-  isl_pw_aff * snk = isl_pw_multi_aff_get_pw_aff(pwm_aff, 0);
-  isl_pw_multi_aff_dump(snk);
-  isl_pw_multi_aff_free(pwm_aff);
-
-  // statement domain
-  isl_set_dump(stmt->domain);
-
-  // source affine
-  isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
-  isl_local_space * lsp = isl_local_space_from_space(sp);
-  stmt->src = isl_aff_var_on_domain(lsp, isl_dim_set, 0);
-  isl_aff_dump(stmt->src);
-
-  // distance between source and sink
-  int success = isl_pw_multi_aff_foreach_piece(snk, check_aff_diff, stmt);
-  
-  std::cout << "DDDDDDDDD" << std::endl;
-
-  //isl_set_dump(stmt->param);
-  isl_pw_multi_aff_free(snk);
-  isl_aff_free(stmt->src);
-  return 0;
-
-}
-
-*/
-
 
 // Affine scan
 // int aff_scan(isl_set *set, isl_aff *aff, void *user){
@@ -827,3 +708,177 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user){
 //   isl_set_free(set);
 //   return 0;
 // }
+
+
+int bound_change(__isl_take isl_constraint * lower, __isl_take isl_constraint * upper, __isl_take isl_basic_set * bset, void * user){
+
+  isl_set * stmt_dom = (isl_set *) (user);  
+
+  std::cout << "*** Lex point lower bound: " << std::endl; 
+  isl_constraint_dump(lower);
+  std::cout << isl_constraint_is_equality(lower) << std::endl; 
+  std::cout << "*** Lex point upper bound: " << std::endl; 
+  isl_constraint_dump(upper);  
+  std::cout << isl_constraint_is_equality(upper) << std::endl;
+  
+  // Create new inequality constaint
+  std::cout << "*** Lex point affine " << std::endl; 
+  isl_aff * tmp_aff = isl_constraint_get_aff(upper);
+  isl_aff_dump(tmp_aff);
+  std::cout << "*** Lex point Constraint " << std::endl;
+  // inequality for non-negative
+  isl_constraint * tmp_cst = isl_inequality_from_aff(tmp_aff);
+  isl_constraint_dump(tmp_cst);
+  
+  std::cout << "*** Add new inner most loop bound " << std::endl; 
+  stmt_dom = isl_set_add_constraint(stmt_dom, tmp_cst);
+  isl_set_dump(stmt_dom);
+  
+  isl_basic_set_free(bset);
+  isl_constraint_free(lower);
+  isl_constraint_free(upper);
+  return 0;
+}
+
+int apply_ineq_upper_bound(__isl_take isl_constraint * c, void * user){
+
+  isl_set * stmt_dom = (isl_set *) (user);  
+  
+  if(isl_constraint_is_upper_bound(c, isl_dim_set, isl_constraint_dim(isl_constraint_copy(c), isl_dim_set)-1)){
+
+    if(isl_constraint_is_equality(c) != 1){
+      std::cout << "*** Inner most dimension inequality constraint " << std::endl;
+      isl_constraint_dump(c);
+
+      std::cout << "*** Add new inner most loop upper bound " << std::endl; 
+      stmt_dom = isl_set_add_constraint(stmt_dom, isl_constraint_copy(c));
+      isl_set_dump(stmt_dom);
+
+      isl_constraint_free(c);
+      return -1;
+    }
+    
+  }
+
+  isl_constraint_free(c);
+
+  return 0;
+}
+
+int apply_eq_upper_bound(__isl_take isl_constraint * c, void * user){
+
+  isl_set * stmt_dom = (isl_set *) (user);  
+  
+  if(isl_constraint_is_upper_bound(c, isl_dim_set, isl_constraint_dim(isl_constraint_copy(c), isl_dim_set)-1)){
+
+    if(isl_constraint_is_equality(c) == 1){
+      std::cout << "*** Inner most dimension equality constraint " << std::endl;
+      isl_constraint_dump(c);
+
+      // Create new inequality constaint
+      std::cout << "*** Point affine " << std::endl; 
+      isl_aff * tmp_aff = isl_constraint_get_aff(c);
+      isl_aff_dump(tmp_aff);
+      std::cout << "*** Inequality Constraint affine" << std::endl;
+      // inequality for non-negative
+      isl_constraint * tmp_cst = isl_inequality_from_aff(tmp_aff);
+      isl_constraint_dump(tmp_cst);
+
+      std::cout << "*** Add new inner most loop upper bound " << std::endl; 
+      stmt_dom = isl_set_add_constraint(stmt_dom, tmp_cst);
+      isl_set_dump(stmt_dom);
+
+      isl_constraint_free(c);
+      return -1;
+    }
+    
+  }
+
+  isl_constraint_free(c);
+
+  return 0;
+}
+
+int constraint_scan(__isl_take isl_basic_set * bset, void * user){
+
+  std::cout << "***** New Basic Set " << std::endl;
+  isl_basic_set_dump(bset);
+  std::cout << isl_basic_set_n_constraint(bset) << std::endl;;
+
+  // take inequality constraints of inner-most dimension as the new upper bound
+  // CURRENT is a rough approach !!!!!!!!
+  int s1 = isl_basic_set_foreach_constraint(bset, apply_ineq_upper_bound, user);
+
+  std::cout << "***** " << s1 << std::endl;
+  
+  // if no iequality constraints are found, the equality ones as the upper bound
+  if(s1 != -1){
+    s1 = isl_basic_set_foreach_constraint(bset, apply_eq_upper_bound, user); 
+  }
+  
+  //int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, isl_basic_set_n_dim(bset)-1, bound_change, user);
+
+  isl_basic_set_free(bset);
+  
+  return s1;
+}
+
+/*
+ * User defined Scop Modification
+ */
+void splitLoop(pet_scop * scop, __isl_keep isl_set * cft){
+
+  // Show Conflict Region 
+  std::cout << "==== Conflict Region: " << std::endl; 
+  isl_set_dump(cft);
+  std::cout << "==== lexmin point: " << std::endl;   
+  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(cft));
+  isl_set_dump(pnt_lexmin); 
+  std::cout << "==== lexmax point: " << std::endl;     
+  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(cft));
+  isl_set_dump(pnt_lexmax);
+
+  // Take statement domain
+  isl_set * stmt_dom = isl_set_copy(scop->stmts[0]->domain);
+  stmt_dom = isl_set_reset_tuple_id(stmt_dom);
+  std::cout << "==== Statement domain: " << std::endl;
+  isl_set_dump(stmt_dom);
+
+  // Add inner most loop bounds as a lexmin/lexmax point
+  isl_set * stmt_dom_p1 = isl_set_copy(stmt_dom);
+  int s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, stmt_dom_p1);
+
+  // // Take first part of domain 
+  // isl_map * lex_map = isl_set_lex_gt_set(isl_set_copy(stmt_dom), stmt_dom_p1);
+  // isl_map_dump(lex_map);
+  
+  // stmt_dom_p1 = isl_map_domain(lex_map);
+  // stmt_dom_p1 = isl_set_remove_redundancies(stmt_dom_p1);
+  // isl_set_dump(stmt_dom_p1);
+  // stmt_dom_p1 = isl_set_coalesce(stmt_dom_p1);
+  
+  // isl_set_dump(stmt_dom_p1);
+  
+  assert(false);
+
+  
+  // isl_map * tmp = isl_set_lex_le_set(tmp_dom ,pnt_lexmax);
+  // isl_map_dump(tmp); 
+
+  // isl_set * s1 = isl_map_domain(tmp);
+  // s1 = isl_set_remove_redundancies(s1);
+  // isl_set_dump(s1);
+  // s1 = isl_set_coalesce(s1);
+  
+  // isl_set_dump(s1);
+
+  
+  //assert(false);
+
+  
+  isl_set_free(pnt_lexmin);
+  isl_set_free(pnt_lexmax);
+
+}
+
+

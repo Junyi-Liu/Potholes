@@ -903,21 +903,14 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   //isl_set * param = isl_set_copy(rlt.param);
   //isl_set * cft = isl_set_copy(rlt.cft);
 
-  // PLAY with conflict region
-  std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;  
-  std::cout << "==== Conflict Region: " << std::endl; 
-  isl_set_dump(rlt.cft);
-  std::cout << "==== lexmin point: " << std::endl;   
-  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt.cft));
-  isl_set_dump(pnt_lexmin);
-  std::cout << "==== lexmax point: " << std::endl;     
-  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt.cft));
-  isl_set_dump(pnt_lexmax);
+  // Apply Loop Splitting based on conflict region
+  std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;
   
-  isl_set_free(pnt_lexmin);
-  isl_set_free(pnt_lexmax);
+  splitLoop(pscop, __isl_keep rlt.cft);
   isl_set_free(rlt.cft);
+ 
   std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;  
+
   
   // Control transformation
   scop->vm = &vm;
