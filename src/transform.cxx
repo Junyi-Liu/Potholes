@@ -742,20 +742,35 @@ int bound_change(__isl_take isl_constraint * lower, __isl_take isl_constraint * 
 
 int apply_ineq_upper_bound(__isl_take isl_constraint * c, void * user){
 
-  isl_set * stmt_dom = (isl_set *) (user);  
+  cst_info * info = (cst_info *) (user);  
   
   if(isl_constraint_is_upper_bound(c, isl_dim_set, isl_constraint_dim(isl_constraint_copy(c), isl_dim_set)-1)){
 
     if(isl_constraint_is_equality(c) != 1){
-      std::cout << "*** Inner most dimension inequality constraint " << std::endl;
+      std::cout << "*** Upper bound of inner-most dimension is an inequality constraint " << std::endl;
       isl_constraint_dump(c);
 
       std::cout << "*** Add new inner most loop upper bound " << std::endl; 
-      stmt_dom = isl_set_add_constraint(stmt_dom, isl_constraint_copy(c));
-      isl_set_dump(stmt_dom);
+      isl_set * dom_tmp = isl_set_add_constraint(isl_set_copy(info->stmt_dom), isl_constraint_copy(c));
 
-      isl_constraint_free(c);
-      return -1;
+      dom_tmp = isl_set_intersect_params(dom_tmp, isl_set_copy(info->param));
+      
+      isl_set_dump(dom_tmp);
+
+      std::cout << "*** Current dom " << std::endl;
+      isl_set_dump(info->new_dom);
+      std::cout << "*** Combine " << std::endl;       
+
+      if(info->n_bst == 0){
+	info->new_dom = isl_set_intersect(dom_tmp, info->new_dom); 
+      }
+      else{
+	info->new_dom = isl_set_union(dom_tmp, info->new_dom); 
+      }
+      
+      isl_set_dump(info->new_dom);      
+
+      info->n_cst +=1; 
     }
     
   }
@@ -767,29 +782,42 @@ int apply_ineq_upper_bound(__isl_take isl_constraint * c, void * user){
 
 int apply_eq_upper_bound(__isl_take isl_constraint * c, void * user){
 
-  isl_set * stmt_dom = (isl_set *) (user);  
+  cst_info * info = (cst_info *) (user);  
+
+  // int s = isl_constraint_is_lower_bound(c, isl_dim_set, isl_constraint_dim(isl_constraint_copy(c), isl_dim_set)-1);
+  // std::cout << "*** Upper bound: "<< s << std::endl; 
+
+  int s = isl_constraint_involves_dims(c, isl_dim_set, isl_constraint_dim(isl_constraint_copy(c), isl_dim_set)-1, 1);
+  std::cout << "*** Inner-most dimension: "<< s << std::endl; 
   
-  if(isl_constraint_is_upper_bound(c, isl_dim_set, isl_constraint_dim(isl_constraint_copy(c), isl_dim_set)-1)){
+  if(s){
 
     if(isl_constraint_is_equality(c) == 1){
-      std::cout << "*** Inner most dimension equality constraint " << std::endl;
+      std::cout << "*** Inner-most dimension equality constraint " << std::endl;
       isl_constraint_dump(c);
 
       // Create new inequality constaint
       std::cout << "*** Point affine " << std::endl; 
       isl_aff * tmp_aff = isl_constraint_get_aff(c);
       isl_aff_dump(tmp_aff);
-      std::cout << "*** Inequality Constraint affine" << std::endl;
-      // inequality for non-negative
+      std::cout << "*** Create inequality constraint affine" << std::endl;
+
+      // tmp_aff * -1
+      isl_space * sp = isl_aff_get_domain_space(tmp_aff);
+      isl_local_space * lsp = isl_local_space_from_space(sp);
+      isl_aff * factor = isl_aff_zero_on_domain(lsp); //zero
+      factor = isl_aff_set_constant_si(factor, -1);
+      tmp_aff = isl_aff_mul(tmp_aff, factor);
+      
+      // inequality for non-negative (>=0)      
       isl_constraint * tmp_cst = isl_inequality_from_aff(tmp_aff);
       isl_constraint_dump(tmp_cst);
 
       std::cout << "*** Add new inner most loop upper bound " << std::endl; 
-      stmt_dom = isl_set_add_constraint(stmt_dom, tmp_cst);
-      isl_set_dump(stmt_dom);
+      info->new_dom = isl_set_add_constraint(info->new_dom, tmp_cst);
+      isl_set_dump(info->new_dom);
 
-      isl_constraint_free(c);
-      return -1;
+      info->n_cst +=1; 
     }
     
   }
@@ -801,26 +829,44 @@ int apply_eq_upper_bound(__isl_take isl_constraint * c, void * user){
 
 int constraint_scan(__isl_take isl_basic_set * bset, void * user){
 
+  // isl_set * stmt_dom = (isl_set *) (user);
+  cst_info * info = (cst_info *) (user);
+  
   std::cout << "***** New Basic Set " << std::endl;
   isl_basic_set_dump(bset);
-  std::cout << isl_basic_set_n_constraint(bset) << std::endl;;
+  //std::cout << isl_basic_set_n_constraint(bset) << std::endl;
+
+  // set up constraint info
+  info->param = isl_set_from_basic_set(isl_basic_set_params(isl_basic_set_copy(bset)));
+  info->n_cst = 0;
+
+  std::cout << "***** Parameter set " << std::endl;
+  isl_set_dump(info->param);
 
   // take inequality constraints of inner-most dimension as the new upper bound
-  // CURRENT is a rough approach !!!!!!!!
-  int s1 = isl_basic_set_foreach_constraint(bset, apply_ineq_upper_bound, user);
-
-  std::cout << "***** " << s1 << std::endl;
+  // CURRENT approach produces rough split points !!!!!!!!
+  int s1 = isl_basic_set_foreach_constraint(bset, apply_ineq_upper_bound, info);
   
-  // if no iequality constraints are found, the equality ones as the upper bound
-  if(s1 != -1){
-    s1 = isl_basic_set_foreach_constraint(bset, apply_eq_upper_bound, user); 
+  // if no iequality constraints are found, take equality ones as the upper bound
+  if(info->n_cst == 0){
+    std::cout << "**** No inequality constraints are found " << std::endl;
+    s1 = isl_basic_set_foreach_constraint(bset, apply_eq_upper_bound, info); 
   }
   
-  //int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, isl_basic_set_n_dim(bset)-1, bound_change, user);
+  //
+  std::cout << "***** New domain " << std::endl;
+  //stmt_dom = isl_set_intersect(stmt_dom, isl_set_copy(info.stmt_dom));
+  info->new_dom = isl_set_remove_redundancies(info->new_dom); 
+  info->new_dom = isl_set_coalesce(info->new_dom);
+  isl_set_dump(info->new_dom);
 
+  info->n_bst +=1; 
+  
+  // isl_set_free(info.stmt_dom);
+  isl_set_free(info->param);
   isl_basic_set_free(bset);
   
-  return s1;
+  return 0;
 }
 
 /*
@@ -845,9 +891,15 @@ void splitLoop(pet_scop * scop, __isl_keep isl_set * cft){
   isl_set_dump(stmt_dom);
 
   // Add inner most loop bounds as a lexmin/lexmax point
-  isl_set * stmt_dom_p1 = isl_set_copy(stmt_dom);
-  int s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, stmt_dom_p1);
+  // isl_set * stmt_dom_p1 = isl_set_copy(stmt_dom);
+  cst_info info;
+  info.stmt_dom = isl_set_copy(stmt_dom);
+  info.new_dom = isl_set_copy(stmt_dom);
+  info.n_bst = 0;
+  int s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, &info);
 
+  isl_set_dump(info.new_dom);
+  
   // // Take first part of domain 
   // isl_map * lex_map = isl_set_lex_gt_set(isl_set_copy(stmt_dom), stmt_dom_p1);
   // isl_map_dump(lex_map);

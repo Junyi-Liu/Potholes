@@ -47,9 +47,10 @@ namespace potholes {
     
 }
 
-/*
- * SCoP Analysis 
- */
+//*********************
+//*** SCoP Analysis 
+//*********************
+
 //#define L_delay 25 // dummy statement delay
 #define delay_info_path "/Users/Junyi/research/HLS/application/vivado_play/loop_info/delay.dat"
 
@@ -149,6 +150,31 @@ int dep_analysis(isl_map * dep, int must, void * dep_user, void * user);
 
 //User defined SCoP analysis
 void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt); 
+
+
+
+//************************
+//*** SCoP Modification 
+//************************
+
+struct cst_info{
+  // stmt domain
+  isl_set * stmt_dom;
+
+  // new domain
+  isl_set * new_dom;
+  
+  // parameter domain
+  isl_set * param;
+  
+  // number of valid constraints
+  int n_cst;
+
+  // number of basic set
+  int n_bst;
+  
+};
+typedef struct cst_info cst_info;
 
 //User defined SCoP Modification
 void splitLoop(pet_scop * scop, __isl_keep isl_set * cft);
