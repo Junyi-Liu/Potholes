@@ -751,24 +751,19 @@ int apply_ineq_upper_bound(__isl_take isl_constraint * c, void * user){
       isl_constraint_dump(c);
 
       std::cout << "*** Add new inner most loop upper bound " << std::endl; 
-      isl_set * dom_tmp = isl_set_add_constraint(isl_set_copy(info->stmt_dom), isl_constraint_copy(c));
+      isl_set * tmp = isl_set_add_constraint(isl_set_copy(info->stmt_dom), isl_constraint_copy(c));
 
-      dom_tmp = isl_set_intersect_params(dom_tmp, isl_set_copy(info->param));
+      tmp = isl_set_intersect_params(tmp, isl_set_copy(info->param));
       
-      isl_set_dump(dom_tmp);
+      isl_set_dump(tmp);
 
-      std::cout << "*** Current dom " << std::endl;
-      isl_set_dump(info->new_dom);
+      std::cout << "*** Current temporary dom " << std::endl;
+      isl_set_dump(info->tmp_dom);
+      
       std::cout << "*** Combine " << std::endl;       
-
-      if(info->n_bst == 0){
-	info->new_dom = isl_set_intersect(dom_tmp, info->new_dom); 
-      }
-      else{
-	info->new_dom = isl_set_union(dom_tmp, info->new_dom); 
-      }
+      info->tmp_dom = isl_set_intersect(tmp, info->tmp_dom); 
       
-      isl_set_dump(info->new_dom);      
+      isl_set_dump(info->tmp_dom);      
 
       info->n_cst +=1; 
     }
@@ -814,8 +809,8 @@ int apply_eq_upper_bound(__isl_take isl_constraint * c, void * user){
       isl_constraint_dump(tmp_cst);
 
       std::cout << "*** Add new inner most loop upper bound " << std::endl; 
-      info->new_dom = isl_set_add_constraint(info->new_dom, tmp_cst);
-      isl_set_dump(info->new_dom);
+      info->tmp_dom = isl_set_add_constraint(info->tmp_dom, tmp_cst);
+      isl_set_dump(info->tmp_dom);
 
       info->n_cst +=1; 
     }
@@ -839,6 +834,7 @@ int constraint_scan(__isl_take isl_basic_set * bset, void * user){
   // set up constraint info
   info->param = isl_set_from_basic_set(isl_basic_set_params(isl_basic_set_copy(bset)));
   info->n_cst = 0;
+  info->tmp_dom = isl_set_copy(info->stmt_dom);
 
   std::cout << "***** Parameter set " << std::endl;
   isl_set_dump(info->param);
@@ -853,35 +849,80 @@ int constraint_scan(__isl_take isl_basic_set * bset, void * user){
     s1 = isl_basic_set_foreach_constraint(bset, apply_eq_upper_bound, info); 
   }
   
-  //
+  // Creat new domian for current basic set
   std::cout << "***** New domain " << std::endl;
-  //stmt_dom = isl_set_intersect(stmt_dom, isl_set_copy(info.stmt_dom));
+  if(info->n_bst == 0){
+    info->new_dom = isl_set_copy(info->tmp_dom); 
+  }
+  else{
+    info->new_dom = isl_set_union(isl_set_copy(info->tmp_dom), info->new_dom); 
+  }
   info->new_dom = isl_set_remove_redundancies(info->new_dom); 
   info->new_dom = isl_set_coalesce(info->new_dom);
   isl_set_dump(info->new_dom);
 
   info->n_bst +=1; 
   
-  // isl_set_free(info.stmt_dom);
+  isl_set_free(info->tmp_dom);
   isl_set_free(info->param);
   isl_basic_set_free(bset);
   
   return 0;
 }
 
+int drop_cst(__isl_take isl_constraint * c, void * user){
+
+  isl_basic_set * b = (isl_basic_set *) (user);
+
+  int ni = isl_constraint_involves_dims(c, isl_dim_set, 0, isl_basic_set_dim(b, isl_dim_set));
+
+  int np = isl_constraint_involves_dims(c, isl_dim_param, 0, isl_basic_set_dim(b, isl_dim_param));
+  
+  if(np!=0 && ni==0){
+    b = isl_basic_set_drop_constraint(b, c);    
+  }
+  else{
+    isl_constraint_free(c);
+  }
+    
+  return 0;
+  
+}
+
+int remove_param(__isl_take isl_basic_set * bset, void * user){
+
+  isl_basic_set * dom = (isl_basic_set *) (user);
+
+  isl_basic_set * b = isl_basic_set_copy(bset);
+  isl_basic_set_dump(bset);
+  
+  int s1 = isl_basic_set_foreach_constraint(bset, drop_cst, b);
+
+  isl_basic_set_dump(bset);
+  std::cout << "++++++++++++ " << std::endl;
+  dom = isl_basic_set_intersect(dom, b);
+  std::cout << "xxxxxxxxxxxx " << std::endl;
+
+  isl_basic_set_dump(dom);
+
+  isl_basic_set_free(bset);
+  return 0;
+}
+
+
 /*
  * User defined Scop Modification
  */
-void splitLoop(pet_scop * scop, __isl_keep isl_set * cft){
+void splitLoop(pet_scop * scop, recur_info * rlt){
 
   // Show Conflict Region 
   std::cout << "==== Conflict Region: " << std::endl; 
-  isl_set_dump(cft);
+  isl_set_dump(rlt->cft);
   std::cout << "==== lexmin point: " << std::endl;   
-  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(cft));
+  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
   isl_set_dump(pnt_lexmin); 
   std::cout << "==== lexmax point: " << std::endl;     
-  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(cft));
+  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
   isl_set_dump(pnt_lexmax);
 
   // Take statement domain
@@ -890,42 +931,62 @@ void splitLoop(pet_scop * scop, __isl_keep isl_set * cft){
   std::cout << "==== Statement domain: " << std::endl;
   isl_set_dump(stmt_dom);
 
-  // Add inner most loop bounds as a lexmin/lexmax point
-  // isl_set * stmt_dom_p1 = isl_set_copy(stmt_dom);
+  // Cut inner most loop bounds by the LEXMAX point
+  std::cout << "\n======= Start domain cut by lexmax of conflict region =======" << std::endl;
   cst_info info;
   info.stmt_dom = isl_set_copy(stmt_dom);
-  info.new_dom = isl_set_copy(stmt_dom);
+  //info.new_dom = isl_set_copy(stmt_dom);
   info.n_bst = 0;
   int s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, &info);
+  isl_set * dom_lexmax = isl_set_copy(info.new_dom);
+  std::cout << "======= End domain cut by lexmax of conflict region =======" << std::endl;
+  isl_set_dump(dom_lexmax);
+  isl_set_free(info.new_dom);
 
-  isl_set_dump(info.new_dom);
+  // Cut inner most loop bounds by the LEXMIN point
+  std::cout << "\n======= Start domain cut by lexmin of conflict region ======" << std::endl;
+  //info.new_dom = isl_set_copy(stmt_dom);
+  info.n_bst = 0;
+  s1 = isl_set_foreach_basic_set(pnt_lexmin, constraint_scan, &info);
+  isl_set * dom_lexmin = isl_set_copy(info.new_dom);
+  std::cout << "======= End domain cut by lexmin of conflict region ======" << std::endl;
+  isl_set_dump(dom_lexmin);
+  isl_set_free(info.new_dom);
+  isl_set_free(info.stmt_dom);
+
+  // Set Subtraction
+  std::cout << "\n======= Domain Subtraction  ======" << std::endl;
+  isl_set * dom_3 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmax));
+  dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
+  dom_3 = isl_set_remove_redundancies(dom_3); 
+  dom_3 = isl_set_coalesce(dom_3);
+  isl_set_dump(dom_3);
+  
+  isl_basic_set * dom_tmp = isl_basic_set_universe(isl_set_get_space(dom_3));
+  s1 = isl_set_foreach_basic_set(dom_3, remove_param, dom_tmp);
+  
+  //dom_tmp = isl_set_remove_redundancies(dom_tmp); 
+  //dom_tmp = isl_set_coalesce(dom_tmp);
+  isl_basic_set_dump(dom_tmp);
+
+  assert(false);
+
+  
+  isl_set * dom_2 = isl_set_subtract(isl_set_copy(dom_lexmax), isl_set_copy(dom_lexmin));
+  dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
+  dom_2 = isl_set_remove_redundancies(dom_2); 
+  dom_2 = isl_set_coalesce(dom_2);
+  isl_set_dump(dom_2);
+  
+  isl_set * dom_1 = isl_set_copy(dom_lexmin);
+  isl_set_dump(dom_1);
   
   // // Take first part of domain 
   // isl_map * lex_map = isl_set_lex_gt_set(isl_set_copy(stmt_dom), stmt_dom_p1);
   // isl_map_dump(lex_map);
   
-  // stmt_dom_p1 = isl_map_domain(lex_map);
-  // stmt_dom_p1 = isl_set_remove_redundancies(stmt_dom_p1);
-  // isl_set_dump(stmt_dom_p1);
-  // stmt_dom_p1 = isl_set_coalesce(stmt_dom_p1);
-  
-  // isl_set_dump(stmt_dom_p1);
   
   assert(false);
-
-  
-  // isl_map * tmp = isl_set_lex_le_set(tmp_dom ,pnt_lexmax);
-  // isl_map_dump(tmp); 
-
-  // isl_set * s1 = isl_map_domain(tmp);
-  // s1 = isl_set_remove_redundancies(s1);
-  // isl_set_dump(s1);
-  // s1 = isl_set_coalesce(s1);
-  
-  // isl_set_dump(s1);
-
-  
-  //assert(false);
 
   
   isl_set_free(pnt_lexmin);

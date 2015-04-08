@@ -163,6 +163,7 @@ struct cst_info{
 
   // new domain
   isl_set * new_dom;
+  isl_set * tmp_dom;
   
   // parameter domain
   isl_set * param;
@@ -177,7 +178,7 @@ struct cst_info{
 typedef struct cst_info cst_info;
 
 //User defined SCoP Modification
-void splitLoop(pet_scop * scop, __isl_keep isl_set * cft);
+void splitLoop(pet_scop * scop, recur_info * rlt);
 
 
 #endif	/* TRANSFORM_H */

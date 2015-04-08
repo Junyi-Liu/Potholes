@@ -906,7 +906,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // Apply Loop Splitting based on conflict region
   std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;
   
-  splitLoop(pscop, __isl_keep rlt.cft);
+  splitLoop(pscop, &rlt);
   isl_set_free(rlt.cft);
  
   std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;  
