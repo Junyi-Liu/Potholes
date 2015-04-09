@@ -864,8 +864,57 @@ isl_ast_node_list * pth_scop_populate_array_definitions(pth_scop * scop) {
 std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name) {
 
   pscop = pet_scop_align_params(pscop);
-    
-  pth_scop * scop = pth_scop_alloc(pscop);   
+
+  /********************************************
+   **  Analyze Scop HERE !!!!!!!!!!
+   ********************************************/
+  
+  VarMap vm, tm;
+  recur_info rlt;
+  analyzeScop(pscop, &vm, &tm, &rlt);
+  //isl_set * param = isl_set_copy(rlt.param);
+  //isl_set * cft = isl_set_copy(rlt.cft);
+
+  // Apply Loop Splitting based on conflict region
+  std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;
+  
+  splitLoop(pscop, &rlt);
+  isl_set_free(rlt.cft);
+
+  isl_set * p = isl_set_empty(isl_set_get_space(rlt.param));
+  isl_set_free(rlt.param);
+  rlt.param = isl_set_copy(p);
+  isl_set_free(p);
+  
+  std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;  
+
+  
+  // Configure transformation
+  pth_scop * scop = pth_scop_alloc(pscop); 
+  scop->vm = &vm;
+  int sw;
+  if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
+    // not able to apply transformation
+    sw = 0;
+    scop->t = 0;
+  }
+  else if(isl_set_plain_is_universe(rlt.param)){
+    // always in safe range, add pragma for fast pipeline
+    std::cout << "\n*********** ALWAYS IN SAFE REGION ****************" << std::endl;
+    std::cout << "Apply pragma for false inter-dependency " << std::endl;
+    sw = 0;
+    scop->t = 1;
+  }
+  else{
+    // apply safe range and add pragma
+    sw = 1;
+    scop->t = 1;
+  }
+
+  
+  /******************************************
+   **  Code Generation
+   ******************************************/
   
   //Junyi: remove A = mem+A_offset !!!!!!!!!!!!!
   //scop = pth_scop_populate_array_offsets(scop);
@@ -896,43 +945,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // create_leaf: val_zero, creat_leaf_user: scop with geneated pth_ast_stmt inserted
   build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
 
-  // ** Analyze Scop HERE !!!!!!!!!!
-  VarMap vm, tm;
-  recur_info rlt;
-  analyzeScop(pscop, &vm, &tm, &rlt);
-  //isl_set * param = isl_set_copy(rlt.param);
-  //isl_set * cft = isl_set_copy(rlt.cft);
 
-  // Apply Loop Splitting based on conflict region
-  std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;
-  
-  splitLoop(pscop, &rlt);
-  isl_set_free(rlt.cft);
- 
-  std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;  
-
-  
-  // Control transformation
-  scop->vm = &vm;
-  int sw;
-  if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
-    // not able to apply transformation
-    sw = 0;
-    scop->t = 0;
-  }
-  else if(isl_set_plain_is_universe(rlt.param)){
-    // always in safe range, add pragma for fast pipeline
-    std::cout << "\n*********** ALWAYS IN SAFE REGION ****************" << std::endl;
-    std::cout << "Apply pragma for false inter-dependency " << std::endl;
-    sw = 0;
-    scop->t = 1;
-  }
-  else{
-    // apply safe range and add pragma
-    sw = 1;
-    scop->t = 1;
-  }
-  
   // turn multi-D pointer into 1D for SCoP generation
   ss << "/* Begin Accelerated Scop */ \n";
   VarMap::iterator argits = vm.begin();
@@ -985,7 +998,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     definitions_list = isl_ast_node_list_add(definitions_list, node); 
   }
-
+  
   // clean param set!!!!!!
   isl_set_free(rlt.param);
 

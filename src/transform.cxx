@@ -7,6 +7,9 @@
 #include <sstream>
 
 #include </Users/Junyi/research/HLS/pet/expr.h>
+#include </Users/Junyi/research/HLS/pet/scop.h>
+#include </Users/Junyi/research/HLS/pet/tree.h>
+#include </Users/Junyi/research/HLS/pet/loc.h>
 
 #include <isl/ilp.h>
 #include <isl/flow.h>
@@ -710,36 +713,6 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 // }
 
 
-int bound_change(__isl_take isl_constraint * lower, __isl_take isl_constraint * upper, __isl_take isl_basic_set * bset, void * user){
-
-  isl_set * stmt_dom = (isl_set *) (user);  
-
-  std::cout << "*** Lex point lower bound: " << std::endl; 
-  isl_constraint_dump(lower);
-  std::cout << isl_constraint_is_equality(lower) << std::endl; 
-  std::cout << "*** Lex point upper bound: " << std::endl; 
-  isl_constraint_dump(upper);  
-  std::cout << isl_constraint_is_equality(upper) << std::endl;
-  
-  // Create new inequality constaint
-  std::cout << "*** Lex point affine " << std::endl; 
-  isl_aff * tmp_aff = isl_constraint_get_aff(upper);
-  isl_aff_dump(tmp_aff);
-  std::cout << "*** Lex point Constraint " << std::endl;
-  // inequality for non-negative
-  isl_constraint * tmp_cst = isl_inequality_from_aff(tmp_aff);
-  isl_constraint_dump(tmp_cst);
-  
-  std::cout << "*** Add new inner most loop bound " << std::endl; 
-  stmt_dom = isl_set_add_constraint(stmt_dom, tmp_cst);
-  isl_set_dump(stmt_dom);
-  
-  isl_basic_set_free(bset);
-  isl_constraint_free(lower);
-  isl_constraint_free(upper);
-  return 0;
-}
-
 int apply_ineq_upper_bound(__isl_take isl_constraint * c, void * user){
 
   cst_info * info = (cst_info *) (user);  
@@ -910,6 +883,40 @@ int remove_param(__isl_take isl_basic_set * bset, void * user){
 }
 
 
+int inc_dim(__isl_take isl_constraint * c, void * user){
+
+  isl_basic_map * bsch = (isl_basic_map *) user;
+
+  int d = isl_basic_map_dim(bsch, isl_dim_out); 
+  
+  //isl_constraint_dump(c);
+  if(isl_constraint_involves_dims(c, isl_dim_out, d-2-1, 1)){
+    c = isl_constraint_set_constant_si(c, -1);
+    bsch = isl_basic_map_add_constraint(bsch, isl_constraint_copy(c));
+  }  
+  
+  isl_constraint_free(c);
+  return 0;
+}
+
+
+int modify_schedule(__isl_take isl_basic_map * bmap, void * user){
+
+  sch_info * sch = (sch_info *) user;
+
+  isl_basic_map * bsch = isl_basic_map_copy(bmap); 
+  bsch = isl_basic_map_drop_constraints_involving_dims(bsch, isl_dim_out, sch->d -2 -1, 1);
+  
+  int s1 = isl_basic_map_foreach_constraint(bmap, inc_dim, bsch);
+
+
+  sch->sch_map = isl_map_from_basic_map(bsch);
+  
+  isl_basic_map_free(bmap); 
+  return 0;
+}
+
+
 /*
  * User defined Scop Modification
  */
@@ -956,6 +963,7 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
 
   // Set Subtraction
   std::cout << "\n======= Domain Subtraction  ======" << std::endl;
+  /*
   isl_set * dom_3 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmax));
   dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
   dom_3 = isl_set_remove_redundancies(dom_3); 
@@ -970,9 +978,10 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
   isl_basic_set_dump(dom_tmp);
 
   assert(false);
-
+  */
   
   isl_set * dom_2 = isl_set_subtract(isl_set_copy(dom_lexmax), isl_set_copy(dom_lexmin));
+  //isl_set * dom_2 = isl_set_copy(dom_lexmin);
   dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
   dom_2 = isl_set_remove_redundancies(dom_2); 
   dom_2 = isl_set_coalesce(dom_2);
@@ -981,17 +990,65 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
   isl_set * dom_1 = isl_set_copy(dom_lexmin);
   isl_set_dump(dom_1);
   
-  // // Take first part of domain 
-  // isl_map * lex_map = isl_set_lex_gt_set(isl_set_copy(stmt_dom), stmt_dom_p1);
-  // isl_map_dump(lex_map);
   
-  
-  assert(false);
+  // Modify SCoP
+  std::cout << "\n======= Modify SCoP  ======" << std::endl;
+  scop->n_stmt = scop->n_stmt+1;
+  std::cout << "XXX " << scop->n_stmt << std::endl;
 
+  // Part 1
+  std::cout << "\n======= Part 1 " << std::endl;
+  isl_id * stmt_id = isl_set_get_tuple_id(scop->stmts[0]->domain);
+  dom_1 = isl_set_set_tuple_id(dom_1, isl_id_copy(stmt_id));
+  isl_set_free(scop->stmts[0]->domain);
+  scop->stmts[0]->domain = isl_set_copy(dom_1);
+  isl_set_dump(scop->stmts[0]->domain);
+  //isl_set_free(dom_2);
+
+  // Part 2
+  std::cout << "\n======= Part 2 " << std::endl;
+  isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[0]->body);
+  scop->stmts[1] = isl_calloc_type(ctx, struct pet_stmt);
+  scop->stmts[1]->loc = scop->stmts[0]->loc;
+
+  scop->stmts[1]->n_arg = scop->stmts[0]->n_arg;
+  for(int i=0; i< scop->stmts[1]->n_arg -1; i++){
+    scop->stmts[1]->args[i] = pet_expr_copy(scop->stmts[0]->args[i]);
+  }
+
+
+  scop->stmts[1]->body = pet_tree_copy(scop->stmts[0]->body);
+  std::cout << "XXXXXX " << scop->stmts[0]->body->ref << std::endl;
+  std::cout << "XXXXXX " << scop->stmts[1]->body->ref << std::endl;
+  //assert(false);
+
+  isl_ctx * id_ctx = isl_id_get_ctx(stmt_id);
+  isl_id * p1_id = isl_id_alloc(id_ctx, "S_0b", NULL);
+  dom_2 = isl_set_set_tuple_id(dom_2, isl_id_copy(p1_id));
+  scop->stmts[1]->domain = isl_set_copy(dom_2);  
+  isl_set_dump(scop->stmts[1]->domain);
+
+  sch_info sch;
+  sch.d = isl_map_dim(scop->stmts[0]->schedule, isl_dim_out); 
+  s1 = isl_map_foreach_basic_map(scop->stmts[0]->schedule, modify_schedule, &sch);
+  sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, p1_id);
+  scop->stmts[1]->schedule = isl_map_copy(sch.sch_map);
+  isl_map_dump(scop->stmts[1]->schedule);
+  isl_map_free(sch.sch_map);
   
+  // Part 3
+  
+  
+  //assert(false);
+  isl_id_free(stmt_id);
+  isl_set_free(dom_2);
+  isl_set_free(dom_1);
+  isl_set_free(stmt_dom);  
+  isl_set_free(dom_lexmax);
+  isl_set_free(dom_lexmin);  
   isl_set_free(pnt_lexmin);
   isl_set_free(pnt_lexmax);
-
+  return;
 }
 
 

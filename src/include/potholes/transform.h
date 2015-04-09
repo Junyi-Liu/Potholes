@@ -177,6 +177,15 @@ struct cst_info{
 };
 typedef struct cst_info cst_info;
 
+struct sch_info{
+  // schedule map
+  isl_map * sch_map;
+
+  // insert dim point
+  int d;
+};
+typedef struct sch_info sch_info;
+
 //User defined SCoP Modification
 void splitLoop(pet_scop * scop, recur_info * rlt);
 
