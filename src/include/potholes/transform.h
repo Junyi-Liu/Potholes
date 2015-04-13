@@ -181,10 +181,18 @@ struct sch_info{
   // schedule map
   isl_map * sch_map;
 
-  // insert dim point
+  // tmp basic map
+  isl_basic_map * bmap;
+  
+  // increment dim point
   int d;
+
+  // dim offset
+  int i;
 };
 typedef struct sch_info sch_info;
+
+__isl_give pet_tree *pet_tree_dup(__isl_keep pet_tree *tree);
 
 //User defined SCoP Modification
 void splitLoop(pet_scop * scop, recur_info * rlt);

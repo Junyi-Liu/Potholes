@@ -885,14 +885,16 @@ int remove_param(__isl_take isl_basic_set * bset, void * user){
 
 int inc_dim(__isl_take isl_constraint * c, void * user){
 
-  isl_basic_map * bsch = (isl_basic_map *) user;
+  sch_info * sch = (sch_info *) user;
 
-  int d = isl_basic_map_dim(bsch, isl_dim_out); 
+  int d = isl_basic_map_dim(sch->bmap, isl_dim_out); 
   
   //isl_constraint_dump(c);
   if(isl_constraint_involves_dims(c, isl_dim_out, d-2-1, 1)){
-    c = isl_constraint_set_constant_si(c, -1);
-    bsch = isl_basic_map_add_constraint(bsch, isl_constraint_copy(c));
+    isl_val * val = isl_constraint_get_constant_val(c);
+    val = isl_val_sub_ui(val, sch->i); //output dim plus 1
+    c = isl_constraint_set_constant_val(c, val);
+    sch->bmap = isl_basic_map_add_constraint(sch->bmap, isl_constraint_copy(c));
   }  
   
   isl_constraint_free(c);
@@ -904,17 +906,30 @@ int modify_schedule(__isl_take isl_basic_map * bmap, void * user){
 
   sch_info * sch = (sch_info *) user;
 
-  isl_basic_map * bsch = isl_basic_map_copy(bmap); 
-  bsch = isl_basic_map_drop_constraints_involving_dims(bsch, isl_dim_out, sch->d -2 -1, 1);
+  sch->bmap = isl_basic_map_copy(bmap); 
+  sch->bmap = isl_basic_map_drop_constraints_involving_dims(sch->bmap, isl_dim_out, sch->d -2-1, 1);
   
-  int s1 = isl_basic_map_foreach_constraint(bmap, inc_dim, bsch);
+  int s1 = isl_basic_map_foreach_constraint(bmap, inc_dim, sch);
 
 
-  sch->sch_map = isl_map_from_basic_map(bsch);
+  sch->sch_map = isl_map_from_basic_map(sch->bmap);
   
   isl_basic_map_free(bmap); 
   return 0;
 }
+
+
+int change_stmt_id(__isl_keep pet_expr *expr, void *user){
+
+  isl_id * p_id = (isl_id *) user;
+
+  isl_map * acc_map = pet_expr_access_get_access(expr);
+  acc_map = isl_map_set_tuple_id(acc_map, isl_dim_in, isl_id_copy(p_id));
+  expr = pet_expr_access_set_access(expr, acc_map);
+  
+  return 0;
+}
+
 
 
 /*
@@ -932,11 +947,14 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
   isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
   isl_set_dump(pnt_lexmax);
 
-  // Take statement domain
+  // Copy Take statement domain
   isl_set * stmt_dom = isl_set_copy(scop->stmts[0]->domain);
   stmt_dom = isl_set_reset_tuple_id(stmt_dom);
   std::cout << "==== Statement domain: " << std::endl;
   isl_set_dump(stmt_dom);
+
+  // Copy statement schedule
+  isl_map * stmt_sch = isl_map_copy(scop->stmts[0]->schedule);
 
   // Cut inner most loop bounds by the LEXMAX point
   std::cout << "\n======= Start domain cut by lexmax of conflict region =======" << std::endl;
@@ -963,22 +981,23 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
 
   // Set Subtraction
   std::cout << "\n======= Domain Subtraction  ======" << std::endl;
-  /*
-  isl_set * dom_3 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmax));
-  dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
+  isl_set * dom_tmp = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
+  isl_set * dom_3 = isl_set_subtract(dom_tmp, isl_set_copy(dom_lexmax));
+  //dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
+  
   dom_3 = isl_set_remove_redundancies(dom_3); 
   dom_3 = isl_set_coalesce(dom_3);
   isl_set_dump(dom_3);
+
   
-  isl_basic_set * dom_tmp = isl_basic_set_universe(isl_set_get_space(dom_3));
-  s1 = isl_set_foreach_basic_set(dom_3, remove_param, dom_tmp);
-  
+  // isl_basic_set * dom_tmp = isl_basic_set_universe(isl_set_get_space(dom_3));
+  // s1 = isl_set_foreach_basic_set(dom_3, remove_param, dom_tmp);
   //dom_tmp = isl_set_remove_redundancies(dom_tmp); 
   //dom_tmp = isl_set_coalesce(dom_tmp);
-  isl_basic_set_dump(dom_tmp);
+  // isl_basic_set_dump(dom_tmp);
 
-  assert(false);
-  */
+  //assert(false);
+  
   
   isl_set * dom_2 = isl_set_subtract(isl_set_copy(dom_lexmax), isl_set_copy(dom_lexmin));
   //isl_set * dom_2 = isl_set_copy(dom_lexmin);
@@ -992,58 +1011,111 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
   
   
   // Modify SCoP
-  std::cout << "\n======= Modify SCoP  ======" << std::endl;
-  scop->n_stmt = scop->n_stmt+1;
-  std::cout << "XXX " << scop->n_stmt << std::endl;
+  std::cout << "\n================= Modify SCoP =================" << std::endl;
+  scop->n_stmt = scop->n_stmt + 2;
 
   // Part 1
   std::cout << "\n======= Part 1 " << std::endl;
+  std::cout << "*** Domain: " << std::endl;
   isl_id * stmt_id = isl_set_get_tuple_id(scop->stmts[0]->domain);
   dom_1 = isl_set_set_tuple_id(dom_1, isl_id_copy(stmt_id));
   isl_set_free(scop->stmts[0]->domain);
   scop->stmts[0]->domain = isl_set_copy(dom_1);
   isl_set_dump(scop->stmts[0]->domain);
   //isl_set_free(dom_2);
-
+  
+  std::cout << "*** Schedule: " << std::endl;
+  scop->stmts[0]->schedule = isl_map_intersect_domain(scop->stmts[0]->schedule, isl_set_copy(dom_1));
+  isl_map_dump(scop->stmts[0]->schedule);
+  
   // Part 2
   std::cout << "\n======= Part 2 " << std::endl;
   isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[0]->body);
   scop->stmts[1] = isl_calloc_type(ctx, struct pet_stmt);
   scop->stmts[1]->loc = scop->stmts[0]->loc;
 
+  std::cout << "*** Copy args: " << std::endl;
   scop->stmts[1]->n_arg = scop->stmts[0]->n_arg;
-  for(int i=0; i< scop->stmts[1]->n_arg -1; i++){
-    scop->stmts[1]->args[i] = pet_expr_copy(scop->stmts[0]->args[i]);
-  }
+  std::cout << "number of args: " << scop->stmts[0]->n_arg << std::endl;
+  if((scop->stmts[0]->n_arg) > 0){
+    for(int i=0; i< (scop->stmts[0]->n_arg) -1; i++){
+      std::cout << "Args:  " << i << std::endl;
+      scop->stmts[1]->args[i] = pet_expr_copy(scop->stmts[0]->args[i]);
+    }    
+  }  
 
-
-  scop->stmts[1]->body = pet_tree_copy(scop->stmts[0]->body);
-  std::cout << "XXXXXX " << scop->stmts[0]->body->ref << std::endl;
-  std::cout << "XXXXXX " << scop->stmts[1]->body->ref << std::endl;
   //assert(false);
 
-  isl_ctx * id_ctx = isl_id_get_ctx(stmt_id);
-  isl_id * p1_id = isl_id_alloc(id_ctx, "S_0b", NULL);
-  dom_2 = isl_set_set_tuple_id(dom_2, isl_id_copy(p1_id));
+  std::cout << "*** Domain: " << std::endl;
+  // isl_id * p_id = isl_id_alloc(ctx, "S_0b", NULL);
+  // dom_2 = isl_set_set_tuple_id(dom_2, isl_id_copy(p_id));
+  dom_2 = isl_set_set_tuple_id(dom_2, isl_id_copy(stmt_id));
   scop->stmts[1]->domain = isl_set_copy(dom_2);  
   isl_set_dump(scop->stmts[1]->domain);
 
+  std::cout << "*** Schedule: " << std::endl;
+  // ?? Problem: scheduling map does not make the loop generated as its tree structre!!!!!!!!!!!!
+  // ?? Currently just use same schedule map for the splitted inner loops
   sch_info sch;
-  sch.d = isl_map_dim(scop->stmts[0]->schedule, isl_dim_out); 
-  s1 = isl_map_foreach_basic_map(scop->stmts[0]->schedule, modify_schedule, &sch);
-  sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, p1_id);
-  scop->stmts[1]->schedule = isl_map_copy(sch.sch_map);
+  sch.d = isl_map_dim(stmt_sch, isl_dim_out);
+  sch.i = 1;
+  s1 = isl_map_foreach_basic_map(stmt_sch, modify_schedule, &sch);
+  sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));
+  //sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, p_id);
+  scop->stmts[1]->schedule = isl_map_intersect_domain(sch.sch_map, isl_set_copy(dom_2));
   isl_map_dump(scop->stmts[1]->schedule);
-  isl_map_free(sch.sch_map);
+  //isl_map_free(sch.sch_map);
+
+  std::cout << "*** Stmt body: " << std::endl;
+  scop->stmts[1]->body = pet_tree_copy(scop->stmts[0]->body);
+  //s1 = pet_tree_foreach_access_expr(scop->stmts[1]->body, change_stmt_id, p_id);
+
+  isl_id_dump(scop->stmts[1]->body->label);
+  //assert(false);
   
   // Part 3
-  
+  std::cout << "\n======= Part 3 " << std::endl;
+  scop->stmts[2] = isl_calloc_type(ctx, struct pet_stmt);
+  scop->stmts[2]->loc = scop->stmts[0]->loc;
+
+  std::cout << "*** Copy args: " << std::endl;
+  scop->stmts[2]->n_arg = scop->stmts[0]->n_arg;
+  std::cout << "number of args: " << scop->stmts[0]->n_arg << std::endl;
+  if((scop->stmts[0]->n_arg) > 0){
+    for(int i=0; i< (scop->stmts[0]->n_arg) -1; i++){
+      std::cout << "Args:  " << i << std::endl;
+      scop->stmts[2]->args[i] = pet_expr_copy(scop->stmts[0]->args[i]);
+    }    
+  }  
+
+  std::cout << "*** Domain: " << std::endl;
+  // p_id = isl_id_alloc(ctx, "S_0c", NULL);
+  // dom_3 = isl_set_set_tuple_id(dom_3, isl_id_copy(p_id));
+  dom_3 = isl_set_set_tuple_id(dom_3, isl_id_copy(stmt_id));
+  scop->stmts[2]->domain = isl_set_copy(dom_3);  
+  isl_set_dump(scop->stmts[2]->domain);
+
+  std::cout << "*** Schedule: " << std::endl;
+  sch.d = isl_map_dim(stmt_sch, isl_dim_out);
+  sch.i = 2;
+  s1 = isl_map_foreach_basic_map(stmt_sch, modify_schedule, &sch);
+  sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));
+  //sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, p_id);
+  scop->stmts[2]->schedule = isl_map_intersect_domain(sch.sch_map, isl_set_copy(dom_3));
+  isl_map_dump(scop->stmts[2]->schedule);
+
+  std::cout << "*** Stmt body: " << std::endl;
+  scop->stmts[2]->body = pet_tree_copy(scop->stmts[0]->body);
+  //s1 = pet_tree_foreach_access_expr(scop->stmts[2]->body, change_stmt_id, p_id);
+
   
   //assert(false);
   isl_id_free(stmt_id);
+  isl_set_free(dom_3);
   isl_set_free(dom_2);
   isl_set_free(dom_1);
   isl_set_free(stmt_dom);  
+  isl_map_free(stmt_sch);  
   isl_set_free(dom_lexmax);
   isl_set_free(dom_lexmin);  
   isl_set_free(pnt_lexmin);
@@ -1052,3 +1124,128 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
 }
 
 
+
+static __isl_give pet_expr *pet_expr_dup(__isl_keep pet_expr *expr)
+{
+	int i;
+	pet_expr *dup;
+
+	if (!expr)
+		return NULL;
+
+	dup = pet_expr_alloc(expr->ctx, expr->type);
+	dup = pet_expr_set_type_size(dup, expr->type_size);
+	dup = pet_expr_set_n_arg(dup, expr->n_arg);
+	for (i = 0; i < expr->n_arg; ++i)
+		dup = pet_expr_set_arg(dup, i, pet_expr_copy(expr->args[i]));
+
+	switch (expr->type) {
+	case pet_expr_access:
+		if (expr->acc.ref_id)
+			dup = pet_expr_access_set_ref_id(dup,
+						isl_id_copy(expr->acc.ref_id));
+		dup = pet_expr_access_set_access(dup,
+						isl_map_copy(expr->acc.access));
+		dup = pet_expr_access_set_index(dup,
+					isl_multi_pw_aff_copy(expr->acc.index));
+		dup = pet_expr_access_set_read(dup, expr->acc.read);
+		dup = pet_expr_access_set_write(dup, expr->acc.write);
+		break;
+	case pet_expr_call:
+		dup = pet_expr_call_set_name(dup, expr->name);
+		break;
+	case pet_expr_cast:
+		dup = pet_expr_cast_set_type_name(dup, expr->type_name);
+		break;
+	case pet_expr_double:
+		dup = pet_expr_double_set(dup, expr->d.val, expr->d.s);
+		break;
+	case pet_expr_int:
+		dup = pet_expr_int_set_val(dup, isl_val_copy(expr->i));
+		break;
+	case pet_expr_op:
+		dup = pet_expr_op_set_type(dup, expr->op);
+		break;
+	case pet_expr_error:
+		dup = pet_expr_free(dup);
+		break;
+	}
+
+	return dup;
+}
+
+/* Return an independent duplicate of "tree".
+ */
+__isl_give pet_tree *pet_tree_dup(__isl_keep pet_tree *tree)
+{
+	int i;
+	pet_tree *dup;
+
+	if (!tree)
+		return NULL;
+
+	switch (tree->type) {
+	case pet_tree_error:
+		return NULL;
+	case pet_tree_block:
+		dup = pet_tree_new_block(tree->ctx, tree->u.b.block,
+					tree->u.b.n);
+		for (i = 0; i < tree->u.b.n; ++i)
+			dup = pet_tree_block_add_child(dup,
+					pet_tree_copy(tree->u.b.child[i]));
+		break;
+	case pet_tree_break:
+		dup = pet_tree_new_break(tree->ctx);
+		break;
+	case pet_tree_continue:
+		dup = pet_tree_new_continue(tree->ctx);
+		break;
+	case pet_tree_decl:
+		dup = pet_tree_new_decl(pet_expr_copy(tree->u.d.var));
+		break;
+	case pet_tree_decl_init:
+		dup = pet_tree_new_decl_init(pet_expr_copy(tree->u.d.var),
+					    pet_expr_copy(tree->u.d.init));
+		break;
+	case pet_tree_expr:
+		dup = pet_tree_new_expr(pet_expr_dup(tree->u.e.expr));
+		break;
+	case pet_tree_for:
+		dup = pet_tree_new_for(tree->u.l.independent,
+		    tree->u.l.declared,
+		    pet_expr_copy(tree->u.l.iv), pet_expr_copy(tree->u.l.init),
+		    pet_expr_copy(tree->u.l.cond), pet_expr_copy(tree->u.l.inc),
+		    pet_tree_copy(tree->u.l.body));
+		break;
+	case pet_tree_while:
+		dup = pet_tree_new_while(pet_expr_copy(tree->u.l.cond),
+					pet_tree_copy(tree->u.l.body));
+		break;
+	case pet_tree_infinite_loop:
+		dup = pet_tree_new_infinite_loop(pet_tree_copy(tree->u.l.body));
+		break;
+	case pet_tree_if:
+		dup = pet_tree_new_if(pet_expr_copy(tree->u.i.cond),
+					pet_tree_copy(tree->u.i.then_body));
+		break;
+	case pet_tree_if_else:
+		dup = pet_tree_new_if_else(pet_expr_copy(tree->u.i.cond),
+					pet_tree_copy(tree->u.i.then_body),
+					pet_tree_copy(tree->u.i.else_body));
+		break;
+	}
+
+	if (!dup)
+		return NULL;
+	pet_loc_free(dup->loc);
+	dup->loc = pet_loc_copy(tree->loc);
+	if (!dup->loc)
+		return pet_tree_free(dup);
+	if (tree->label) {
+		dup->label = isl_id_copy(tree->label);
+		if (!dup->label)
+			return pet_tree_free(dup);
+	}
+
+	return dup;
+}
