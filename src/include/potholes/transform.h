@@ -157,6 +157,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt);
 //*** SCoP Modification 
 //************************
 
+// Constraint manipulation for splitting domain
 struct cst_info{
   // stmt domain
   isl_set * stmt_dom;
@@ -177,6 +178,20 @@ struct cst_info{
 };
 typedef struct cst_info cst_info;
 
+// Parameter constraint manipulation
+struct par_info{
+
+  isl_set * dom;
+
+  isl_basic_set * b;
+
+  isl_set * param;
+
+};
+typedef struct par_info par_info;
+
+
+// Schedule map manipulation for inserting duplicated statements with splitted domains
 struct sch_info{
   // schedule map
   isl_map * sch_map;
