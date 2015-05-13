@@ -174,6 +174,9 @@ struct cst_info{
 
   // number of basic set
   int n_bst;
+
+  // splitting position of dimension
+  int i_dim;
   
 };
 typedef struct cst_info cst_info;
