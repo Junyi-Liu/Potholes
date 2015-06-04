@@ -996,7 +996,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 
   // ** Apply transformation HERE!!!!!!!!!!!!!!
   if(sw){
-    std::cout << "\n*********** SCOP TRANSFORMATION START ****************" << std::endl;
+    std::cout << "\n*********** START GENERATE SCOP WITH PARAMETRIC PIPELINING ****************" << std::endl;
 
     // check universality at first !!!!!!!
     //isl_set_plain_is_universe(param)
@@ -1007,7 +1007,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
     isl_ast_node_dump(p_ast);
 
-    std::cout << "************* SCOP TRANSFORMATION END ****************\n" << std::endl;     
+    std::cout << "************* END GENERATE SCOP WITH PARAMETRIC PIPELINING ****************\n" << std::endl;     
 
     // generate the whole ast node corresponding to the SCoP and added into one list  
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
@@ -1029,14 +1029,17 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node_free(node);
   }
   else{
-    std::cout << "\n*********** NO SCOP TRANSFORMATION APPLIED ****************" << std::endl;
+    std::cout << "\n*********** START GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
-    definitions_list = isl_ast_node_list_add(definitions_list, node); 
+    definitions_list = isl_ast_node_list_add(definitions_list, node);
+    std::cout << "\n*********** END GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
   }
 
   // clean param set!!!!!!
   isl_set_free(rlt.param);
+
+  std::cout << "\n*********** START PRINT SCOP ****************" << std::endl;
   
   // convert ast_node list into ast block node
   isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));
@@ -1049,6 +1052,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   ss << isl_printer_get_str(printer) << "\n";
   ss << "/* End Accelerated Scop */ \n";
 
+  std::cout << "\n*********** END PRINT SCOP ****************\n" << std::endl;
+  
   // isl_ast_build_free(build);
   //std::cout << " FREE !!!!!!!" << std::endl;
   isl_ast_node_free(block);
