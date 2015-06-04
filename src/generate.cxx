@@ -675,10 +675,10 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     else if(scop->t == 2){
       // FOR LOOP SPLITTING  
       if( !strcmp(id_str, "S_0") || !strcmp(id_str, "p3") ){
-	stmt->t = 0; // default pipelining
+	stmt->t = 1; // fast pipelining
       }
       else if(!strcmp(id_str, "p2")){
-	stmt->t = 1; // fast pipelining
+	stmt->t = 0; // default pipelining
       }
       else{
 	stmt->t = 2; // nothing added
@@ -722,7 +722,10 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   // add pragma for forcing pipelining
   if(stmt->t == 1 ){
     std::cout << "printing pragma for fast execution"<< std::endl;
+
+#ifdef PLP
     stmt->t = 0; // assign 0 for slow part
+#endif
 
     // always try pipelining
     printer = isl_printer_start_line(printer);
