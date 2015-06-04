@@ -116,7 +116,8 @@ struct pth_scop {
   pth_array_offset_p array_offsets;
 
   VarMap * vm;
-  int t;
+  int t; //tansformation config label
+  //int pre_n_stmt;
 };
 
 

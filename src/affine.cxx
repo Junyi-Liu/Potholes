@@ -993,8 +993,12 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
     isl_map_dump(amap);
     amap = isl_map_apply_range(map, amap);
     isl_map_dump(amap);
+
+    // align tuple id
+    isl_id * st_id = isl_set_get_tuple_id(stmt->domain);
+    amap = isl_map_set_tuple_id(amap, isl_dim_in, st_id);
     
-    isl_union_map_dump(build->executed);
+    isl_union_map_dump(build->executed);       
     isl_union_map * umap = isl_union_map_apply_range(isl_union_map_copy(build->executed), isl_union_map_from_map(isl_map_copy(amap)));
     isl_union_map_dump(umap);
 

@@ -643,7 +643,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     
   pth_scop * scop = (pth_scop *)(user);
 
-  isl_ast_node * node = NULL;
+  //isl_ast_node * node = NULL;
     
   pth_ast_build * pbuild = pth_ast_build_from_isl_ast_build(build);
     
@@ -655,17 +655,34 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     isl_id * tuple_id;
     int success = isl_union_map_foreach_map(pbuild->executed, extract_statement, &tuple_id);
     (void)(success);
+
+    const char * id_str = isl_id_get_name(tuple_id);    
+    std::cout << "=== ast generation for stmt : " << id_str << std::endl;
+    //isl_id_dump(tuple_id);
     
     // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);
+    
     // add control for print transformation pragma
-    if(scop->t == 1){
-      stmt->t = 1;
-      scop->t = 2;
-    }
-    else if(scop->t == 0){
+    if(scop->t == 0){
       stmt->t = 0;
-      scop->t = 2;      
+      scop->t = -1;      
+    }
+    else if(scop->t == 1){
+      stmt->t = 1;
+      scop->t = -1;      
+    }
+    else if(scop->t == 2){
+      // FOR LOOP SPLITTING  
+      if( !strcmp(id_str, "S_0") || !strcmp(id_str, "p3") ){
+	stmt->t = 0; // default pipelining
+      }
+      else if(!strcmp(id_str, "p2")){
+	stmt->t = 1; // fast pipelining
+      }
+      else{
+	stmt->t = 2; // nothing added
+      }
     }
     else{
       stmt->t = 2;
@@ -678,12 +695,12 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     isl_val * val = isl_val_zero(pth_ast_build_get_ctx(pbuild));
     isl_ast_node * node = isl_ast_node_alloc_user(isl_ast_expr_from_val(val)); 
     // set statement tuple_id for getting the user_statement to print later
-    isl_ast_node_set_annotation(node, tuple_id);
+    node = isl_ast_node_set_annotation(node, tuple_id);
     return node;
   }       
 
   assert(false);
-  return node;
+  return NULL;
 }
 
 
@@ -704,7 +721,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
 
   // add pragma for forcing pipelining
   if(stmt->t == 1 ){
-    std::cout << "printing pragma for transformation"<< std::endl;
+    std::cout << "printing pragma for fast execution"<< std::endl;
     stmt->t = 0; // assign 0 for slow part
 
     // always try pipelining
@@ -724,8 +741,8 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
 	
   }
   else if(stmt->t == 0){
-    std::cout << "printing pragma for slow loop"<< std::endl;
-    // always try pipelining
+    std::cout << "printing pragma for slow execution"<< std::endl;
+    // always try pipelining!!!!
     printer = isl_printer_start_line(printer);    
     printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
     printer = isl_printer_end_line(printer);    
@@ -770,6 +787,8 @@ isl_printer * pth_print_user_statement(isl_printer * printer, isl_ast_print_opti
   // look up pth stmt from scop    
   pth_ast_stmt * stmt = pth_ast_get_scop_statement_by_id(scop, statement_id);
 
+  isl_id_dump(statement_id);
+  std::cout << "stmt->t: "<< stmt->t << std::endl;
   
   if (stmt) { 
     
@@ -864,7 +883,8 @@ isl_ast_node_list * pth_scop_populate_array_definitions(pth_scop * scop) {
 std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name) {
 
   pscop = pet_scop_align_params(pscop);
-
+  int pre_n_stmt = pscop->n_stmt;
+  
   /********************************************
    **  Analyze Scop HERE !!!!!!!!!!
    ********************************************/
@@ -875,18 +895,15 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   //isl_set * param = isl_set_copy(rlt.param);
   //isl_set * cft = isl_set_copy(rlt.cft);
 
+  
   // Apply Loop Splitting based on conflict region
   std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;
-  
+#ifdef LSP
   splitLoop(pscop, &rlt);
-  isl_set_free(rlt.cft);
-
-  isl_set * p = isl_set_empty(isl_set_get_space(rlt.param));
-  isl_set_free(rlt.param);
-  rlt.param = isl_set_copy(p);
-  isl_set_free(p);
+#endif
   
-  std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;  
+  isl_set_free(rlt.cft);  
+  std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;
 
   
   // Configure transformation
@@ -895,6 +912,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   int sw;
   if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
     // not able to apply transformation
+    std::cout << "\n*********** NO SAFE REGION FOUND ****************" << std::endl;
+    std::cout << "Keep original codes " << std::endl;
     sw = 0;
     scop->t = 0;
   }
@@ -906,12 +925,26 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     scop->t = 1;
   }
   else{
+    // safe region exists
+    std::cout << "\n*********** NOT ALWAYS IN SAFE REGION ****************" << std::endl;
+    
     // apply safe range and add pragma
+#ifdef PLP
+    std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
     sw = 1;
     scop->t = 1;
+#endif
+    
+#ifdef LSP
+    // add pragmas for loop splitting
+    std::cout << "Apply pragma for loop splitting" << std::endl;
+    sw = 0;
+    scop->t = 2;
+#endif
+    
   }
 
-  
+      
   /******************************************
    **  Code Generation
    ******************************************/
@@ -944,7 +977,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // set up AST node generation for every leaf in the generated AST
   // create_leaf: val_zero, creat_leaf_user: scop with geneated pth_ast_stmt inserted
   build = isl_ast_build_set_create_leaf(build, pth_generate_user_statement, scop);
-
+  
 
   // turn multi-D pointer into 1D for SCoP generation
   ss << "/* Begin Accelerated Scop */ \n";
@@ -998,10 +1031,10 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     definitions_list = isl_ast_node_list_add(definitions_list, node); 
   }
-  
+
   // clean param set!!!!!!
   isl_set_free(rlt.param);
-
+  
   // convert ast_node list into ast block node
   isl_ast_node * block = pth_ast_node_to_isl_ast_node(pth_ast_node_alloc_block(definitions_list));
     
@@ -1013,10 +1046,21 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   ss << isl_printer_get_str(printer) << "\n";
   ss << "/* End Accelerated Scop */ \n";
 
+  // isl_ast_build_free(build);
+  std::cout << " FREE !!!!!!!" << std::endl;
   isl_ast_node_free(block);
   isl_printer_free(printer);
+
+  std::cout << " Return !!!!!!!" << std::endl;
   return ss.str();
 }
+
+  // for(int i=0;i < scop->n_stmt ; i++){
+  //   free(scop->stmts[i]);
+  // }
+  // free(scop->stmts);
+  // free(scop->array_offsets);
+  // free(scop);
 
 
 // ast_node general alloc

@@ -72,6 +72,7 @@ clang::SourceLocation potholes::ExtractScop::find_insert_location(clang::SourceM
   clang::SourceLocation candidate_location;
                 
   pet_scop * scop = GetScop(getAbsolutePath(filename))->scop;
+  
   if (scop) {           
 
     // not sure if this start is same as the original one
@@ -79,22 +80,25 @@ clang::SourceLocation potholes::ExtractScop::find_insert_location(clang::SourceM
     //unsigned start = scop->start;
     
     unsigned candidate_offset = 0;
-         
-                 
-                    
-    clang::SourceManager::fileinfo_iterator fit;
+                             
+    //clang::SourceManager::fileinfo_iterator fit;
 
     std::set<clang::SourceLocation> locations = lm.getLocations(); 
     std::set<clang::SourceLocation>::iterator slit;
-                    
+
     for (slit = locations.begin() ; slit != locations.end() ; slit++) {
       std::string location_filename = sm.getFilename(*slit);
+      
       if (location_filename == filename) { 
 	candidate_found = true;
+
 	if (candidate_offset == 0) { 
 	  candidate_location = sm.getLocForStartOfFile(sm.getFileID(*slit));
 	}
-	unsigned file_offset = sm.getFileOffset(*slit);
+
+	unsigned file_offset = 0;
+	// Weird segmentation fault here!!!!!!!!!
+	//unsigned file_offset = sm.getFileOffset(*slit);
 	if ((file_offset < start) && (file_offset > candidate_offset)) {
 	  candidate_offset = file_offset;
 	  candidate_location = *slit;

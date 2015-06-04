@@ -215,6 +215,8 @@ __isl_give pet_tree *pet_tree_dup(__isl_keep pet_tree *tree);
 //User defined SCoP Modification
 void splitLoop(pet_scop * scop, recur_info * rlt);
 
+#define LSP //PLP
+
 
 #endif	/* TRANSFORM_H */
 

@@ -57,7 +57,12 @@ void potholes::PromoteScop::ApplyTransformation(clang::Rewriter& rewriter) {
 
   // Scop replacement
   removeScop(rewriter);
+
+#ifdef LSP
   insertScop(rewriter);
+#endif
+
+  return;
 
 }
          
@@ -103,7 +108,6 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	    //Junyi
 	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name));
 
-
 	  }
 	}
       }
@@ -112,7 +116,8 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
       
     }
   }
-
+  
+  return;
 
 }
                                  
@@ -123,7 +128,7 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
   std::vector<std::string>::iterator pit;
   for (pit = paths.begin(); pit != paths.end(); pit++) {
     
-    potholes::Scop * scop = analysis.extractor.GetScop(getAbsolutePath(*pit));
+    //potholes::Scop * scop = analysis.extractor.GetScop(getAbsolutePath(*pit));
     clang::SourceManager & sm = rewriter.getSourceMgr();
     clang::SourceManager::fileinfo_iterator fit;
     
@@ -133,15 +138,20 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
       if (fe) {
                    
 	if (std::string(fe->getName()) == getAbsolutePath(*pit)) {
-                                
+	  std::cout << " 6666666 " << std::endl;                                
 	  // Find location to insert scop declaration
 	  clang::SourceLocation insertLocation = analysis.extractor.find_insert_location(sm, getAbsolutePath(*pit));
 	  // Inserts scop function declaration
-                            
+  
 	  std::stringstream  ss;
 	  //ss << "/* Begin Accelerated Scop Definition */ \n";
 
 	  std::string function_name = "accelerated_scop";
+
+	  ss << "/* Begin Extra Functions Definition */ \n";
+	  ss << "int min(int a, int b) { return (a<b) ? a, b;} \n";
+	  ss << "int max(int a, int b) { return (a>b) ? a, b;} \n";
+	  ss << "/* End Extra Functions Definition */ \n\n";
 	  
 	  //Junyi: Remove Declaration for inline transformation
 	  //ss << pth_generate_scop_function_declaration(scop->scop, function_name) << "\n";
@@ -153,6 +163,8 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
       }
     }
   }
+  
+  return;
 }
 
 // /*
