@@ -883,7 +883,6 @@ isl_ast_node_list * pth_scop_populate_array_definitions(pth_scop * scop) {
 std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string function_name) {
 
   pscop = pet_scop_align_params(pscop);
-  int pre_n_stmt = pscop->n_stmt;
   
   /********************************************
    **  Analyze Scop HERE !!!!!!!!!!
@@ -1047,20 +1046,21 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   ss << "/* End Accelerated Scop */ \n";
 
   // isl_ast_build_free(build);
-  std::cout << " FREE !!!!!!!" << std::endl;
+  //std::cout << " FREE !!!!!!!" << std::endl;
   isl_ast_node_free(block);
   isl_printer_free(printer);
 
-  std::cout << " Return !!!!!!!" << std::endl;
+  for(int i=0;i < scop->n_stmt ; i++){
+    free(scop->stmts[i]);
+  }
+  free(scop->stmts);
+  free(scop->array_offsets);
+  free(scop);
+  
   return ss.str();
 }
 
-  // for(int i=0;i < scop->n_stmt ; i++){
-  //   free(scop->stmts[i]);
-  // }
-  // free(scop->stmts);
-  // free(scop->array_offsets);
-  // free(scop);
+
 
 
 // ast_node general alloc

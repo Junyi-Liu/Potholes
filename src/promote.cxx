@@ -138,7 +138,7 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
       if (fe) {
                    
 	if (std::string(fe->getName()) == getAbsolutePath(*pit)) {
-	  std::cout << " 6666666 " << std::endl;                                
+	  
 	  // Find location to insert scop declaration
 	  clang::SourceLocation insertLocation = analysis.extractor.find_insert_location(sm, getAbsolutePath(*pit));
 	  // Inserts scop function declaration
