@@ -895,16 +895,6 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   //isl_set * cft = isl_set_copy(rlt.cft);
 
   
-  // Apply Loop Splitting based on conflict region
-  std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;
-#ifdef LSP
-  splitLoop(pscop, &rlt);
-#endif
-  
-  isl_set_free(rlt.cft);  
-  std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;
-
-  
   // Configure transformation
   pth_scop * scop = pth_scop_alloc(pscop); 
   scop->vm = &vm;
@@ -943,6 +933,20 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     
   }
 
+
+  // Apply Loop Splitting based on conflict region
+#ifdef LSP
+  if(scop->t == 2){
+    std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;  
+    // split scop
+    splitLoop(pscop, &rlt);
+
+    std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;
+  }
+#endif
+  
+  isl_set_free(rlt.cft);  
+  
       
   /******************************************
    **  Code Generation
