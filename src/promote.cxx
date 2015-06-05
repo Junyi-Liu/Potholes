@@ -149,8 +149,8 @@ void potholes::PromoteScop::insertScop(clang::Rewriter& rewriter) {
 	  std::string function_name = "accelerated_scop";
 
 	  ss << "/* Begin Extra Functions Definition */ \n";
-	  ss << "int min(int a, int b) { return (a<b) ? a, b;} \n";
-	  ss << "int max(int a, int b) { return (a>b) ? a, b;} \n";
+	  ss << "int min(int a, int b) { return (a<b) ? a : b;} \n";
+	  ss << "int max(int a, int b) { return (a>b) ? a : b;} \n";
 	  ss << "/* End Extra Functions Definition */ \n\n";
 	  
 	  //Junyi: Remove Declaration for inline transformation
