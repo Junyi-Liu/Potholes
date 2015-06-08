@@ -158,12 +158,15 @@ isl_aff * get_dim_size(__isl_keep isl_set * set, unsigned dim){
 
   isl_pw_aff * max_pwaff = isl_set_dim_max(isl_set_copy(set), dim);
   isl_pw_aff * min_pwaff = isl_set_dim_min(isl_set_copy(set), dim);
-  //isl_pw_aff_dump(max_pwaff);
-  //isl_pw_aff_dump(min_pwaff);
+  isl_pw_aff_dump(max_pwaff);
+  isl_pw_aff_dump(min_pwaff);
   
   isl_pw_aff * dist_pwaff = isl_pw_aff_sub(max_pwaff, min_pwaff);
   isl_pw_aff_dump(dist_pwaff);
 
+  isl_set_dump(set);
+  //assert(false);
+  
   isl_aff * dist_aff = NULL;  
   int success = isl_pw_aff_foreach_piece(dist_pwaff, get_aff_plus_1, &dist_aff);
   isl_aff_dump(dist_aff);
@@ -1070,9 +1073,10 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
 
     // remove conflict region related parameter constraints
     dom_3 = remove_param_cft(dom_3, rlt->param);
+    //dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
     isl_set_dump(dom_3);
   
-    // assert(false);
+    //assert(false);
   
     // Part 2
     std::cout << "*** Part 2: " << std::endl;
@@ -1099,6 +1103,7 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
   
     // remove conflict region related constraints
     dom_2 = remove_param_cft(dom_2, rlt->param);
+    //dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
     isl_set_dump(dom_2);
   
     // Part 1
@@ -1114,8 +1119,20 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
   
     // remove conflict region related constraints
     dom_1 = remove_param_cft(dom_1, rlt->param);
+    //dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
     isl_set_dump(dom_1);
-  
+
+    // Special Case: dom_1 and dom_3 are all empty
+    if(isl_set_is_empty(dom_1) && isl_set_is_empty(dom_1)){
+      // Apply paramteric loop pipelining
+      std::cout << "*** Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
+      isl_set_free(dom_3);
+      dom_3 = isl_set_copy(dom_2);
+      dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
+      dom_3 = isl_set_intersect_params(dom_3, isl_set_copy(rlt->param));    
+    }
+
+    
     //assert(false);
   
     // Modify SCoP
@@ -1239,7 +1256,7 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
     isl_set_free(dom_lexmax);
     isl_set_free(dom_lexmin);
 
-    isl_ctx_free(ctx);
+    //isl_ctx_free(ctx);
     std::cout << "==================== End statement in SCoP: "<< i_st << " ===================" << std::endl;
   }
 
