@@ -723,9 +723,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   if(stmt->t == 1 ){
     std::cout << "printing pragma for fast execution"<< std::endl;
 
-#ifdef PLP
-    stmt->t = 0; // assign 0 for slow part
-#endif
+    if(scop->t == -1) stmt->t = 0; // assign 0 for slow part
 
     // always try pipelining
     printer = isl_printer_start_line(printer);
@@ -942,7 +940,13 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   if(scop->t == 2){
     std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;  
     // split scop
-    splitLoop(pscop, &rlt);
+    int lsp = splitLoop(pscop, &rlt);
+
+    if(lsp){
+      std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
+      sw = 1;
+      scop->t = 1;
+    }
 
     std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;
   }

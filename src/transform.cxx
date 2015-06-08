@@ -964,7 +964,7 @@ __isl_give isl_set * remove_param_cft(__isl_take isl_set * dom, __isl_keep isl_s
 /*
  * User defined Scop Modification
  */
-void splitLoop(pet_scop * scop, recur_info * rlt){
+int splitLoop(pet_scop * scop, recur_info * rlt){
 
   // Show Conflict Region 
   std::cout << "==== Conflict Region: " << std::endl; 
@@ -1059,9 +1059,9 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "\n======= Domain Subtraction  ======" << std::endl;
     // Part 3
     std::cout << "*** Part 3: " << std::endl;
-    isl_set * dom_3 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
-    dom_3 = isl_set_subtract(dom_3, isl_set_copy(dom_lexmax));
-    //isl_set * dom_3 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmax));
+    // isl_set * dom_3 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
+    // dom_3 = isl_set_subtract(dom_3, isl_set_copy(dom_lexmax));
+    isl_set * dom_3 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmax));
     //isl_set_dump(dom_3);
 
     // check whether splitted dim is single valued
@@ -1083,19 +1083,24 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
     isl_set * dom_2;
     if(ds_lexmin == 1 && ds_3 == 1){
       // all in slow
+      std::cout << "* all in slow " << std::endl;
       dom_2 = isl_set_copy(stmt_dom);
     }
     else if(ds_lexmin == 1){
       // combine part 1 and 2
+      std::cout << "* combine part 1 and part 2" << std::endl;
       dom_2 = isl_set_copy(dom_lexmax);
     }
     else if(ds_3 == 1){
       // combine part 2 and 3
-      dom_2 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
-      dom_2 = isl_set_subtract(dom_2, isl_set_copy(dom_lexmin));
+      std::cout << "* combine part 2 and part 3 " << std::endl;
+      // dom_2 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
+      // dom_2 = isl_set_subtract(dom_2, isl_set_copy(dom_lexmin));
+      dom_2 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmin));
     }
     else{
       // just part 2
+      std::cout << "* just part 2 " << std::endl;
       dom_2 = isl_set_subtract(isl_set_copy(dom_lexmax), isl_set_copy(dom_lexmin));
     }
     //dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
@@ -1126,10 +1131,18 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
     if(isl_set_is_empty(dom_1) && isl_set_is_empty(dom_1)){
       // Apply paramteric loop pipelining
       std::cout << "*** Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
+      // not fully cleaned !!!!!!!!!!!!
+      scop->n_stmt = n_stmt;
       isl_set_free(dom_3);
-      dom_3 = isl_set_copy(dom_2);
-      dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
-      dom_3 = isl_set_intersect_params(dom_3, isl_set_copy(rlt->param));    
+      isl_set_free(dom_2);
+      isl_set_free(dom_1);
+      isl_set_free(stmt_dom);  
+      isl_map_free(stmt_sch);  
+      isl_set_free(dom_lexmax);
+      isl_set_free(dom_lexmin);
+      isl_set_free(pnt_lexmin);
+      isl_set_free(pnt_lexmax);
+      return 1;
     }
 
     
@@ -1262,6 +1275,6 @@ void splitLoop(pet_scop * scop, recur_info * rlt){
 
   isl_set_free(pnt_lexmin);
   isl_set_free(pnt_lexmax);
-  return;
+  return 0;
 }
 
