@@ -520,6 +520,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   }
   std::istringstream (line) >> stmt.L_delay;
   std::cout<< "*** Delay info: " << stmt.L_delay << std::endl;
+  rlt->delay = stmt.L_delay;
   stmt.L_delay = ceil(float(stmt.L_delay)/float(stmt.II));
   std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
 
@@ -1149,6 +1150,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     
     int t = 0;
     if(n_bs_1 > 3 || n_bs_2 > 3 || n_bs_3 > 3){
+      //if(n_bs_1 > 4){
       std::cout << "==== Too many basic sets for loop splitting" << std::endl;
       t = 1;
     }

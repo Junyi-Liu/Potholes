@@ -744,8 +744,11 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   else if(stmt->t == 0){
     std::cout << "printing pragma for slow execution"<< std::endl;
     // always try pipelining!!!!
+    std::stringstream ss;
+    ss << "#pragma HLS PIPELINE";
+    if(scop->t == 2) ss << " II=" << scop->delay; // for loop splitting
     printer = isl_printer_start_line(printer);    
-    printer = isl_printer_print_str(printer, "#pragma HLS PIPELINE");
+    printer = isl_printer_print_str(printer, ss.str().c_str());
     printer = isl_printer_end_line(printer);    
   }
 
@@ -899,6 +902,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // Configure transformation
   pth_scop * scop = pth_scop_alloc(pscop); 
   scop->vm = &vm;
+  scop->delay = rlt.delay;
   int sw;
   if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
     // not able to apply transformation

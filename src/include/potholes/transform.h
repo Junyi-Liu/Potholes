@@ -137,6 +137,9 @@ struct recur_info{
   
   // iteration conflict region
   isl_set * cft = NULL;
+
+  // loop delay
+  int delay;
   
 };
 typedef struct recur_info recur_info;  
