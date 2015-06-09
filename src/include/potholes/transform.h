@@ -181,6 +181,15 @@ struct cst_info{
 };
 typedef struct cst_info cst_info;
 
+// domain seperation
+struct dom_sep{
+  isl_set * dom_n; // non-single bsets
+  isl_set * dom_s; // single bsets
+  int i_dim;
+  int s;
+};
+typedef struct dom_sep dom_sep;
+
 // Parameter constraint manipulation
 struct par_info{
 
@@ -192,7 +201,6 @@ struct par_info{
 
 };
 typedef struct par_info par_info;
-
 
 // Schedule map manipulation for inserting duplicated statements with splitted domains
 struct sch_info{
@@ -215,6 +223,7 @@ __isl_give pet_tree *pet_tree_dup(__isl_keep pet_tree *tree);
 //User defined SCoP Modification
 int splitLoop(pet_scop * scop, recur_info * rlt);
 
+// Configure optimization mode
 #define LSP //PLP
 
 

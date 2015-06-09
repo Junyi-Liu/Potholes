@@ -790,6 +790,7 @@ int apply_eq_upper_bound(__isl_take isl_constraint * c, void * user){
 
       std::cout << "*** Add new inner most loop upper bound " << std::endl; 
       info->tmp_dom = isl_set_add_constraint(info->tmp_dom, tmp_cst);
+      info->tmp_dom = isl_set_intersect_params(info->tmp_dom, isl_set_copy(info->param));
       isl_set_dump(info->tmp_dom);
 
       info->n_cst +=1; 
@@ -929,8 +930,27 @@ int check_dim_single(__isl_keep isl_set * dom, int pos){
   int ds = isl_pw_aff_is_equal(dim_min, dim_max);
   isl_pw_aff_free(dim_min);
   isl_pw_aff_free(dim_max);
-  std::cout << "*** dom splitted dim is single-valued: " << ds << std::endl;
+  //std::cout << "*** dom splitted dim is single-valued: " << ds << std::endl;
   return ds;
+}
+
+// seperate single basic sets 
+int seperate_singles(__isl_take isl_basic_set *bset, void *user){
+
+  dom_sep * sep = (dom_sep *) user;
+
+  isl_set * tmp_set = isl_set_from_basic_set(bset);
+  int s = check_dim_single(tmp_set, sep->i_dim);
+
+  if(s){
+    sep->dom_s = isl_set_union(sep->dom_s, tmp_set);
+    sep->s = 1;
+  }
+  else{
+    sep->dom_n = isl_set_union(sep->dom_n, tmp_set);    
+  }
+  
+  return 0;
 }
 
 // for schedule map splitting
@@ -1073,8 +1093,6 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       dom_3 = isl_set_empty(isl_set_get_space(stmt_dom));
     }    
 
-    // remove conflict region related parameter constraints
-    dom_3 = remove_param_cft(dom_3, rlt->param);
     //dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
     isl_set_dump(dom_3);
   
@@ -1105,11 +1123,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       std::cout << "* just part 2 " << std::endl;
       dom_2 = isl_set_subtract(isl_set_copy(dom_lexmax), isl_set_copy(dom_lexmin));
     }
-    //dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
-    //isl_set_dump(dom_2);
   
-    // remove conflict region related constraints
-    dom_2 = remove_param_cft(dom_2, rlt->param);
     //dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
     isl_set_dump(dom_2);
   
@@ -1122,15 +1136,12 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     else{    
       dom_1 = isl_set_empty(isl_set_get_space(dom_2));
     }
-    //isl_set_dump(dom_1);
   
-    // remove conflict region related constraints
-    dom_1 = remove_param_cft(dom_1, rlt->param);
     //dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
     isl_set_dump(dom_1);
 
     // Special Case: dom_1 and dom_3 are all empty
-    if(isl_set_is_empty(dom_1) && isl_set_is_empty(dom_1)){
+    if(ds_lexmin == 1 && ds_3 == 1){
       // Apply paramteric loop pipelining
       std::cout << "*** Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
       // recover statement counter and domains
@@ -1154,6 +1165,53 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       return 1;
     }
 
+    //Special Case: dom_1 and dom_3 are not fully single
+    if(ds_lexmin != 1 && ds_3 != 1){
+      std::cout << "*** Seperate single basic sets of dom_1 and dom_3" << std::endl;
+      dom_sep sep;
+      sep.i_dim = i_dim;
+
+      sep.s = 0;
+      sep.dom_n = isl_set_empty(isl_set_get_space(stmt_dom));
+      sep.dom_s = isl_set_empty(isl_set_get_space(stmt_dom));
+      s1 = isl_set_foreach_basic_set(dom_1, seperate_singles, &sep);
+      if(sep.s){
+	isl_set_free(dom_1);
+	dom_1 = isl_set_copy(sep.dom_n);
+	dom_2 = isl_set_union(dom_2, sep.dom_s);
+	isl_set_free(sep.dom_n);
+	dom_1 = isl_set_remove_redundancies(dom_1);
+	dom_1 = isl_set_coalesce(dom_1);
+	dom_2 = isl_set_remove_redundancies(dom_2);
+	dom_2 = isl_set_coalesce(dom_2);
+      }
+
+      sep.s = 0;
+      sep.dom_n = isl_set_empty(isl_set_get_space(stmt_dom));
+      sep.dom_s = isl_set_empty(isl_set_get_space(stmt_dom));
+      s1 = isl_set_foreach_basic_set(dom_3, seperate_singles, &sep);
+      if(sep.s){
+	isl_set_free(dom_3);
+	dom_3 = isl_set_copy(sep.dom_n);
+	dom_2 = isl_set_union(dom_2, sep.dom_s);
+	isl_set_free(sep.dom_n);
+	dom_3 = isl_set_remove_redundancies(dom_3);
+	dom_3 = isl_set_coalesce(dom_3);
+	dom_2 = isl_set_remove_redundancies(dom_2);
+	dom_2 = isl_set_coalesce(dom_2);
+      }      
+    }
+    
+    // remove conflict region related parameter constraints
+    //dom_3 = remove_param_cft(dom_3, rlt->param);
+    //dom_2 = remove_param_cft(dom_2, rlt->param);
+    //dom_1 = remove_param_cft(dom_1, rlt->param);
+    std::cout << "\n*** Dom 1: " << std::endl;
+    isl_set_dump(dom_1);
+    std::cout << "*** Dom 2: " << std::endl;
+    isl_set_dump(dom_2);
+    std::cout << "*** Dom 3: " << std::endl;
+    isl_set_dump(dom_3);
     
     //assert(false);
   
