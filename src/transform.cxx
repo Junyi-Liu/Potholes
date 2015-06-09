@@ -984,6 +984,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   // statement information
   std::cout << "==== Number of statements in SCoP: "<< scop->n_stmt << std::endl;
   int n_stmt = scop->n_stmt;
+  isl_set * stmt_dom_rcd[n_stmt]; //statement domain record
 
   for(int i_st=0; i_st < n_stmt; i_st++){
     //int i_st = 0;
@@ -992,6 +993,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // Copy statement domain
     isl_set * stmt_dom = isl_set_copy(scop->stmts[i_st]->domain);
+    stmt_dom_rcd[i_st] = isl_set_copy(stmt_dom);
     stmt_dom = isl_set_reset_tuple_id(stmt_dom);
     std::cout << "==== Statement domain: " << std::endl;
     isl_set_dump(stmt_dom);
@@ -1131,8 +1133,15 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     if(isl_set_is_empty(dom_1) && isl_set_is_empty(dom_1)){
       // Apply paramteric loop pipelining
       std::cout << "*** Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
-      // not fully cleaned !!!!!!!!!!!!
+      // recover statement counter and domains
       scop->n_stmt = n_stmt;
+      for(int j=0; j<i_st; j++){
+	isl_set_free(scop->stmts[j]->domain);
+	scop->stmts[j]->domain = isl_set_copy(stmt_dom_rcd[j]);
+	isl_set_free(stmt_dom_rcd[j]);
+      }
+      // not fully cleaned !!!!!!!!!!!!
+      isl_set_free(stmt_dom_rcd[i_st]);
       isl_set_free(dom_3);
       isl_set_free(dom_2);
       isl_set_free(dom_1);
@@ -1273,6 +1282,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "==================== End statement in SCoP: "<< i_st << " ===================" << std::endl;
   }
 
+  for(int i_st=0; i_st<n_stmt; i_st++){
+    isl_set_free(stmt_dom_rcd[i_st]);
+  }
   isl_set_free(pnt_lexmin);
   isl_set_free(pnt_lexmax);
   return 0;
