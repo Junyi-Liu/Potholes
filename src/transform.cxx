@@ -1141,9 +1141,24 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     isl_set_dump(dom_1);
 
     // Special Case: dom_1 and dom_3 are all empty
+    int n_bs_1 = isl_set_n_basic_set(dom_1);
+    int n_bs_2 = isl_set_n_basic_set(dom_2);
+    int n_bs_3 = isl_set_n_basic_set(dom_3);
+    int n_bs = n_bs_1 + n_bs_2 + n_bs_3;
+    std::cout << "*** Sum of bset number : "<< n_bs << std::endl;
+    
+    int t = 0;
+    if(n_bs > 6){
+      std::cout << "==== Too many basic sets for loop splitting" << std::endl;
+      t = 1;
+    }
     if(ds_lexmin == 1 && ds_3 == 1){
-      // Apply paramteric loop pipelining
-      std::cout << "*** Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
+      std::cout << "==== Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
+      t = 1;
+    }
+
+    // terminate early for applying parametric loop pipelining
+    if(t){
       // recover statement counter and domains
       scop->n_stmt = n_stmt;
       for(int j=0; j<i_st; j++){
@@ -1165,8 +1180,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       return 1;
     }
 
-    //Special Case: dom_1 and dom_3 are not fully single
-    if(ds_lexmin != 1 && ds_3 != 1){
+    //Special Case: dom_1 or dom_3 are not fully single
+    if(ds_lexmin != 1 || ds_3 != 1){
       std::cout << "*** Seperate single basic sets of dom_1 and dom_3" << std::endl;
       dom_sep sep;
       sep.i_dim = i_dim;
