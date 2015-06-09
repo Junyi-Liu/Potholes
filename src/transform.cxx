@@ -1148,7 +1148,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "*** Sum of bset number : "<< n_bs << std::endl;
     
     int t = 0;
-    if(n_bs > 6){
+    if(n_bs_1 > 3 || n_bs_2 > 3 || n_bs_3 > 3){
       std::cout << "==== Too many basic sets for loop splitting" << std::endl;
       t = 1;
     }
