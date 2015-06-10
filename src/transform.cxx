@@ -948,7 +948,7 @@ int seperate_singles(__isl_take isl_basic_set *bset, void *user){
     sep->s = 1;
   }
   else{
-    sep->dom_n = isl_set_union(sep->dom_n, tmp_set);    
+    sep->dom_n = isl_set_union(sep->dom_n, tmp_set);
   }
   
   return 0;
@@ -1152,7 +1152,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     if(n_bs_1 > 3 || n_bs_2 > 3 || n_bs_3 > 3){
       //if(n_bs_1 > 4){
       std::cout << "==== Too many basic sets for loop splitting" << std::endl;
-      t = 1;
+      t = 0;
     }
     if(ds_lexmin == 1 && ds_3 == 1){
       std::cout << "==== Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;

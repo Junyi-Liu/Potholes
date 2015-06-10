@@ -1077,8 +1077,8 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
 
   }
   
-
   isl_ast_expr_dump(access);
+  //assert(false);
   return access;
 }
 

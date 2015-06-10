@@ -286,7 +286,7 @@ pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build * build, pth_scop * sc
   
   pth_ast_stmt * output = pth_ast_stmt_alloc(pth_assign_stmt);
    
-  output->id = stmt_id;
+  output->id = isl_id_copy(stmt_id);
    
   pth_expr * lhs_expr = expr->args[pet_bin_lhs];
   pth_expr * rhs_expr = expr->args[pet_bin_rhs];
@@ -635,9 +635,10 @@ int extract_statement(isl_map *map, void *user) {
   isl_space * space = isl_map_get_space(map);
   isl_id ** tuple_id = (isl_id **)(user);
   *tuple_id = isl_id_copy(isl_space_get_tuple_id(space, isl_dim_out));
+
+  isl_map_free(map);
   return 1;
 }
-
 
 isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) { 
     
@@ -650,18 +651,26 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
 
   int map_count = isl_union_map_n_map(pbuild->executed);
 
+  // Further simplfy domains !!!!
+  pbuild->executed = isl_union_map_coalesce(pbuild->executed);
+  isl_union_map_dump(pbuild->executed);
+
+  // assert(false);
 
   if (map_count == 1) {
     isl_id * tuple_id;
     int success = isl_union_map_foreach_map(pbuild->executed, extract_statement, &tuple_id);
     (void)(success);
 
-    const char * id_str = isl_id_get_name(tuple_id);    
+    const char * id_str = isl_id_get_name(tuple_id);
     std::cout << "=== ast generation for stmt : " << id_str << std::endl;
-    //isl_id_dump(tuple_id);
-    
+    int p1 = !strcmp(id_str, "S_0");
+    int p2 = !strcmp(id_str, "p2");
+    int p3 = !strcmp(id_str, "p3");
+    //isl_id_dump(tuple_id);   
+
     // generate ast_stmt
-    pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);
+    pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);    
     
     // add control for print transformation pragma
     if(scop->t == 0){
@@ -674,10 +683,10 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
     else if(scop->t == 2){
       // FOR LOOP SPLITTING  
-      if( !strcmp(id_str, "S_0") || !strcmp(id_str, "p3") ){
+      if( p1 || p3 ){
 	stmt->t = 1; // fast pipelining
       }
-      else if(!strcmp(id_str, "p2")){
+      else if(p2){
 	stmt->t = 0; // default pipelining
       }
       else{
@@ -687,6 +696,15 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     else{
       stmt->t = 2;
     }
+
+    // append id name with statement number for correct printing based on unique ids 
+    isl_ctx * ctx = isl_id_get_ctx(tuple_id);
+    std::stringstream ss;
+    ss << id_str << "_" << scop->n_stmt;	
+    isl_id_free(tuple_id);
+    tuple_id = isl_id_alloc(ctx, ss.str().c_str(), NULL);
+    isl_id_free(stmt->id);
+    stmt->id = isl_id_copy(tuple_id);   
     
     // insert generated stmt in scop user pointer
     pth_scop_insert_stmt(scop, stmt);
