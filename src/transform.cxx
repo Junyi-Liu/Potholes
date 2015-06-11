@@ -154,20 +154,21 @@ int acc_order(void * first, void * second){
 // }
 
 // Extract lower & upper bounds in isl_aff 
-int extract_dim_bound(__isl_take isl_constraint * c, void * user){
+//int extract_dim_bound(__isl_take isl_constraint * c, void * user){
+int extract_dim_bound(__isl_take isl_constraint * lw, __isl_take isl_constraint * up, __isl_take isl_basic_set * bset, void * user){
   bd_info * bd = (bd_info *) user;
   //isl_constraint_dump(c);
-  if( isl_constraint_involves_dims(c, isl_dim_set, bd->dim, 1) ){
-    if( isl_constraint_is_lower_bound(c, isl_dim_set, bd->dim) ){
-        bd->min = isl_constraint_get_bound(c, isl_dim_set, bd->dim);
-	isl_aff_dump(bd->min);
-    }
-    if( isl_constraint_is_upper_bound(c, isl_dim_set, bd->dim) ){
-        bd->max = isl_constraint_get_bound(c, isl_dim_set, bd->dim);
-	isl_aff_dump(bd->max);
-    }        
-  }    
-  isl_constraint_free(c);
+  
+  std::cout <<"-- lower bd: " << std::endl; 
+  bd->min = isl_constraint_get_bound(lw, isl_dim_set, bd->dim);
+  isl_aff_dump(bd->min);
+  std::cout <<"-- upper bd: " << std::endl; 
+  bd->max = isl_constraint_get_bound(up, isl_dim_set, bd->dim);
+  isl_aff_dump(bd->max);
+  
+  isl_constraint_free(lw);
+  isl_constraint_free(up);
+  isl_basic_set_free(bset);
   return 0;
 }
 
@@ -177,7 +178,8 @@ int scan_bset_for_bd(__isl_take isl_basic_set *bset, void *user){
   bd_info * bd = (bd_info *) user;
 
   //not handle bset number>1
-  int s1 = isl_basic_set_foreach_constraint(bset, extract_dim_bound, bd);
+  //int s1 = isl_basic_set_foreach_constraint(bset, extract_dim_bound, bd);
+  int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, bd->dim, extract_dim_bound, bd);
   
   isl_basic_set_free(bset);
   return 0;
@@ -964,15 +966,58 @@ int change_stmt_id(__isl_keep pet_expr *expr, void *user){
   return 0;
 }
 
+// compare bound pair
+int cmp_bound_pair(__isl_take isl_constraint * lw, __isl_take isl_constraint * up, __isl_take isl_basic_set * bset, void * user){
+
+  bd_info * bd = (bd_info *) user;
+  std::cout <<"-- lower bd: " << std::endl; 
+  bd->min = isl_constraint_get_bound(lw, isl_dim_set, bd->dim);
+  isl_aff_dump(bd->min);
+  std::cout <<"-- upper bd: " << std::endl; 
+  bd->max = isl_constraint_get_bound(up, isl_dim_set, bd->dim);
+  isl_aff_dump(bd->max);
+
+  int ds = isl_aff_plain_is_equal(bd->max, bd->min);
+  if(ds) bd->has_single = 1;
+  else bd->has_not_single = 1;
+  // std::cout <<"-- bd equal: " << ds << std::endl; 
+  
+  isl_aff_free(bd->max);
+  isl_aff_free(bd->min);
+  isl_constraint_free(lw);
+  isl_constraint_free(up);
+  isl_basic_set_free(bset);
+  return 0;
+}
+
+// Scan bset for single dim
+int scan_bset_for_single_dim(__isl_take isl_basic_set *bset, void *user){
+
+  bd_info * bd = (bd_info *) user;
+
+  //check each bset
+  int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, bd->dim, cmp_bound_pair, bd);
+
+  isl_basic_set_free(bset);
+  return 0;
+}
+
 // check whether the specific dimension of the set is single-valued
 int check_dim_single(__isl_keep isl_set * dom, int pos){
-  isl_pw_aff * dim_min = isl_set_dim_min(isl_set_copy(dom), pos); 
-  isl_pw_aff * dim_max = isl_set_dim_max(isl_set_copy(dom), pos);
-  int ds = isl_pw_aff_is_equal(dim_min, dim_max);
-  isl_pw_aff_free(dim_min);
-  isl_pw_aff_free(dim_max);
+  // isl_pw_aff * dim_min = isl_set_dim_min(isl_set_copy(dom), pos); 
+  // isl_pw_aff * dim_max = isl_set_dim_max(isl_set_copy(dom), pos);
+  // int ds = isl_pw_aff_is_equal(dim_min, dim_max);
+  // isl_pw_aff_free(dim_min);
+  // isl_pw_aff_free(dim_max);
+
+  bd_info bd;
+  bd.has_single = 0;
+  bd.has_not_single = 0;
+  bd.dim = pos;
+  int s1 = isl_set_foreach_basic_set(dom, scan_bset_for_single_dim, &bd);
+
   //std::cout << "*** dom splitted dim is single-valued: " << ds << std::endl;
-  return ds;
+  return !(bd.has_not_single);  //sensitive to any bset not single
 }
 
 // seperate single basic sets 
@@ -1026,19 +1071,35 @@ __isl_give isl_set * remove_param_cft(__isl_take isl_set * dom, __isl_keep isl_s
  * User defined Scop Modification
  */
 int splitLoop(pet_scop * scop, recur_info * rlt){
-
+   
   // Show Conflict Region 
   std::cout << "==== Conflict Region: " << std::endl; 
   isl_set_dump(rlt->cft);
-  std::cout << "==== lexmin point: " << std::endl;   
-  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
-  isl_set_dump(pnt_lexmin); 
-  std::cout << "==== lexmax point: " << std::endl;     
-  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
-  isl_set_dump(pnt_lexmax);
 
   // dimension number of conflict set
   int n_cd = isl_set_dim(rlt->cft, isl_dim_set);
+
+  int ds_cft = 0;
+  for(int i=0; i<n_cd; i++){
+    ds_cft += check_dim_single(rlt->cft, i);
+  }
+
+  isl_set * pnt_lexmin;
+  isl_set * pnt_lexmax;
+  if(ds_cft == n_cd){
+    std::cout << "==== All dims of cft are single ==== " << std::endl;
+    pnt_lexmin = isl_set_copy(rlt->cft);
+    pnt_lexmax = isl_set_copy(rlt->cft);
+  }
+  else{
+    pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
+    pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
+  }
+  std::cout << "==== lexmin point: " << std::endl;   
+  isl_set_dump(pnt_lexmin); 
+  std::cout << "==== lexmax point: " << std::endl;     
+  isl_set_dump(pnt_lexmax);
+
   
   //assert(false);
   
@@ -1090,6 +1151,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
     std::cout << "==== Dimension to be splitted: " << i_dim << std::endl;
 
+    std::cout << "==== eq_max: " << eq_max << std::endl;
+    //assert(false);
+    
     // Cut inner most loop bounds by the LEXMAX point
     std::cout << "\n======= Start domain cut by lexmax of conflict region =======" << std::endl;
     cst_info info;
@@ -1125,7 +1189,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // isl_set * dom_3 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
     // dom_3 = isl_set_subtract(dom_3, isl_set_copy(dom_lexmax));
     isl_set * dom_3 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmax));
-    //isl_set_dump(dom_3);
+    dom_3 = isl_set_remove_redundancies(dom_3);
+    dom_3 = isl_set_coalesce(dom_3);
+    isl_set_dump(dom_3);
 
     // check whether splitted dim is single valued
     int ds_3 = check_dim_single(dom_3, i_dim);
@@ -1166,6 +1232,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
   
     //dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
+    dom_2 = isl_set_remove_redundancies(dom_2);
+    dom_2 = isl_set_coalesce(dom_2);
     isl_set_dump(dom_2);
   
     // Part 1
@@ -1179,6 +1247,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
   
     //dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
+    dom_1 = isl_set_remove_redundancies(dom_1);
+    dom_1 = isl_set_coalesce(dom_1);
     isl_set_dump(dom_1);
 
     // Special Case: dom_1 and dom_3 are all empty
@@ -1223,46 +1293,56 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
 
     //Special Case: dom_1 or dom_3 are not fully single
-    if(ds_lexmin != 1 || ds_3 != 1){
-      std::cout << "*** Seperate single basic sets of dom_1 and dom_3" << std::endl;
-      dom_sep sep;
+    dom_sep sep;
+    if(ds_lexmin != 1){
+      std::cout << "*** Seperate single basic sets of dom_1 " << std::endl;
       sep.i_dim = i_dim;
-
       sep.s = 0;
       sep.dom_n = isl_set_empty(isl_set_get_space(stmt_dom));
       sep.dom_s = isl_set_empty(isl_set_get_space(stmt_dom));
       s1 = isl_set_foreach_basic_set(dom_1, seperate_singles, &sep);
       if(sep.s){
+	std::cout << "* Found single bsets" << std::endl;
 	isl_set_free(dom_1);
 	dom_1 = isl_set_copy(sep.dom_n);
 	dom_2 = isl_set_union(dom_2, sep.dom_s);
 	isl_set_free(sep.dom_n);
-	dom_1 = isl_set_remove_redundancies(dom_1);
-	dom_1 = isl_set_coalesce(dom_1);
-	dom_2 = isl_set_remove_redundancies(dom_2);
-	dom_2 = isl_set_coalesce(dom_2);
       }
-
+      else{
+	isl_set_free(sep.dom_n);
+	isl_set_free(sep.dom_s);
+      }
+    }
+    if(ds_3 != 1){
+      std::cout << "*** Seperate single basic sets of dom_3" << std::endl;
+      sep.i_dim = i_dim;      
       sep.s = 0;
       sep.dom_n = isl_set_empty(isl_set_get_space(stmt_dom));
       sep.dom_s = isl_set_empty(isl_set_get_space(stmt_dom));
       s1 = isl_set_foreach_basic_set(dom_3, seperate_singles, &sep);
       if(sep.s){
+	std::cout << "* Found single bsets" << std::endl;
 	isl_set_free(dom_3);
 	dom_3 = isl_set_copy(sep.dom_n);
 	dom_2 = isl_set_union(dom_2, sep.dom_s);
 	isl_set_free(sep.dom_n);
-	dom_3 = isl_set_remove_redundancies(dom_3);
-	dom_3 = isl_set_coalesce(dom_3);
-	dom_2 = isl_set_remove_redundancies(dom_2);
-	dom_2 = isl_set_coalesce(dom_2);
-      }      
+      }
+      else{
+	isl_set_free(sep.dom_n);
+	isl_set_free(sep.dom_s);
+      }
     }
     
     // remove conflict region related parameter constraints
     //dom_3 = remove_param_cft(dom_3, rlt->param);
     //dom_2 = remove_param_cft(dom_2, rlt->param);
     //dom_1 = remove_param_cft(dom_1, rlt->param);
+    dom_1 = isl_set_remove_redundancies(dom_1);
+    dom_1 = isl_set_coalesce(dom_1);
+    dom_2 = isl_set_remove_redundancies(dom_2);
+    dom_2 = isl_set_coalesce(dom_2);
+    dom_3 = isl_set_remove_redundancies(dom_3);
+    dom_3 = isl_set_coalesce(dom_3);
     std::cout << "\n*** Dom 1: " << std::endl;
     isl_set_dump(dom_1);
     std::cout << "*** Dom 2: " << std::endl;

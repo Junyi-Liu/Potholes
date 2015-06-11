@@ -146,9 +146,11 @@ typedef struct recur_info recur_info;
 
 // for dim size calculation
 struct bd_info{
-  isl_aff * max;
-  isl_aff * min;
+  isl_aff * max = NULL;
+  isl_aff * min = NULL;
   int dim;
+  int has_single;
+  int has_not_single;
 };
 typedef struct drp_info drp_info;
 
