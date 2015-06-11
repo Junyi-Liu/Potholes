@@ -652,6 +652,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
   int map_count = isl_union_map_n_map(pbuild->executed);
 
   // Further simplfy domains !!!!
+  std::cout << "=========== New ast build union map ==========" << std::endl;
   pbuild->executed = isl_union_map_coalesce(pbuild->executed);
   isl_union_map_dump(pbuild->executed);
 

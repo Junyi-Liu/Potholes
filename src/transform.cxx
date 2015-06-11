@@ -139,52 +139,92 @@ int acc_order(void * first, void * second){
 }
 
 // get affine+1 for get_dim_size
-int get_aff_plus_1(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user ){
+// int get_aff_plus_1(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user ){
 
-  isl_aff ** dist_aff = (isl_aff **)user;
+//   isl_aff ** dist_aff = (isl_aff **)user;
   
-  if( *dist_aff == NULL ){
-    *dist_aff = isl_aff_copy(aff);
-    isl_aff_dump(*dist_aff);
-  }
+//   if( *dist_aff == NULL ){
+//     *dist_aff = isl_aff_copy(aff);
+//     isl_aff_dump(*dist_aff);
+//   }
 
-  isl_aff_free(aff);
-  isl_set_free(set);
+//   isl_aff_free(aff);
+//   isl_set_free(set);
+//   return 0;
+// }
+
+// Extract lower & upper bounds in isl_aff 
+int extract_dim_bound(__isl_take isl_constraint * c, void * user){
+  bd_info * bd = (bd_info *) user;
+  //isl_constraint_dump(c);
+  if( isl_constraint_involves_dims(c, isl_dim_set, bd->dim, 1) ){
+    if( isl_constraint_is_lower_bound(c, isl_dim_set, bd->dim) ){
+        bd->min = isl_constraint_get_bound(c, isl_dim_set, bd->dim);
+	isl_aff_dump(bd->min);
+    }
+    if( isl_constraint_is_upper_bound(c, isl_dim_set, bd->dim) ){
+        bd->max = isl_constraint_get_bound(c, isl_dim_set, bd->dim);
+	isl_aff_dump(bd->max);
+    }        
+  }    
+  isl_constraint_free(c);
+  return 0;
+}
+
+// Scan bset for lower & upper bounds
+int scan_bset_for_bd(__isl_take isl_basic_set *bset, void *user){
+
+  bd_info * bd = (bd_info *) user;
+
+  //not handle bset number>1
+  int s1 = isl_basic_set_foreach_constraint(bset, extract_dim_bound, bd);
+  
+  isl_basic_set_free(bset);
   return 0;
 }
 
 // Get the size of the dimention of a given isl_set
 isl_aff * get_dim_size(__isl_keep isl_set * set, unsigned dim){
 
-  isl_pw_aff * max_pwaff = isl_set_dim_max(isl_set_copy(set), dim);
-  isl_pw_aff * min_pwaff = isl_set_dim_min(isl_set_copy(set), dim);
-  isl_pw_aff_dump(max_pwaff);
-  isl_pw_aff_dump(min_pwaff);
-  
-  isl_pw_aff * dist_pwaff = isl_pw_aff_sub(max_pwaff, min_pwaff);
-  isl_pw_aff_dump(dist_pwaff);
-
   isl_set_dump(set);
+  
+  // isl_pw_aff * max_pwaff = isl_set_dim_max(isl_set_copy(set), dim);
+  // isl_pw_aff * min_pwaff = isl_set_dim_min(isl_set_copy(set), dim);
+  // isl_pw_aff_dump(max_pwaff);
+  // isl_pw_aff_dump(min_pwaff);
+  
+  // isl_pw_aff * dist_pwaff = isl_pw_aff_sub(max_pwaff, min_pwaff);
+  // isl_pw_aff_dump(dist_pwaff);
+
+  // assert(false);
+  
+  // isl_aff * dist_aff = NULL;  
+  // int success = isl_pw_aff_foreach_piece(dist_pwaff, get_aff_plus_1, &dist_aff);
+  // isl_aff_dump(dist_aff);
+
+  // isl_space * sp = isl_set_get_space(set);
+  // isl_aff * rtn_aff = isl_aff_zero_on_domain(isl_local_space_from_space(sp));
+  
+  // // copy distance affine to the proper domain space
+  // rtn_aff = isl_aff_set_constant_val(rtn_aff, isl_aff_get_constant_val(dist_aff));
+  // for(int i = 0; i< isl_aff_dim(rtn_aff, isl_dim_param); i++){
+  //   rtn_aff = isl_aff_set_coefficient_val(rtn_aff, isl_dim_param, i, isl_aff_get_coefficient_val(dist_aff, isl_dim_param, i));
+  // }
+  // isl_aff_dump(rtn_aff);
+
+  // //isl_pw_aff_free(dist_pwaff);
+  // isl_aff_free(dist_aff);
+  // return isl_aff_add_constant_si(rtn_aff, 1); //max-min+1
+  
+  bd_info bd;
+  bd.dim = dim;
+  int s1 = isl_set_foreach_basic_set(set, scan_bset_for_bd, &bd);
+
+  isl_aff * dist_aff = isl_aff_sub(bd.max, bd.min);
+  isl_aff_dump(dist_aff);
   //assert(false);
   
-  isl_aff * dist_aff = NULL;  
-  int success = isl_pw_aff_foreach_piece(dist_pwaff, get_aff_plus_1, &dist_aff);
-  isl_aff_dump(dist_aff);
-
-
-  isl_space * sp = isl_set_get_space(set);
-  isl_aff * rtn_aff = isl_aff_zero_on_domain(isl_local_space_from_space(sp));
-  
-  // copy distance affine to the proper domain space
-  rtn_aff = isl_aff_set_constant_val(rtn_aff, isl_aff_get_constant_val(dist_aff));
-  for(int i = 0; i< isl_aff_dim(rtn_aff, isl_dim_param); i++){
-    rtn_aff = isl_aff_set_coefficient_val(rtn_aff, isl_dim_param, i, isl_aff_get_coefficient_val(dist_aff, isl_dim_param, i));
-  }
-  isl_aff_dump(rtn_aff);
-
-  isl_pw_aff_free(dist_pwaff);
-  isl_aff_free(dist_aff);
-  return isl_aff_add_constant_si(rtn_aff, 1); //max-min+1
+  return isl_aff_add_constant_si(dist_aff, 1); //max-min+1
 }
 
 // check multi-affine difference

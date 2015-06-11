@@ -144,6 +144,14 @@ struct recur_info{
 };
 typedef struct recur_info recur_info;  
 
+// for dim size calculation
+struct bd_info{
+  isl_aff * max;
+  isl_aff * min;
+  int dim;
+};
+typedef struct drp_info drp_info;
+
 int aff_scan(isl_set *set, isl_aff *aff, void *user);
 int acc_expr_scan(pet_expr *expr, void *user);
 int acc_expr_info(pet_expr *expr, void *user);
