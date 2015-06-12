@@ -894,77 +894,7 @@ int constraint_scan(__isl_take isl_basic_set * bset, void * user){
   return 0;
 }
 
-int drop_cst(__isl_take isl_constraint * c, void * user){
-  par_info * p = (par_info *) (user);
-  // drop conflict region related parameter constraints
-  // local space must be same
-  p->b = isl_basic_set_drop_constraint(p->b, c);
-  return 0;
-}
 
-int remove_param(__isl_take isl_basic_set * bset, void * user){
-  int s1 = isl_basic_set_foreach_constraint(bset, drop_cst, user);
-  isl_basic_set_free(bset);
-  return 0;
-}
-
-int scan_bset(__isl_take isl_basic_set * bset, void * user){
-
-  par_info * p = (par_info *) (user);
-
-  p->b = isl_basic_set_copy(bset);  
-  int s1 = isl_set_foreach_basic_set(p->param, remove_param, p);
-  //isl_basic_set_dump(p->b);
-  p->dom = isl_set_union(p->dom, isl_set_from_basic_set(p->b));
-  
-  isl_basic_set_free(bset);
-  return 0;
-}
-
-
-int inc_dim(__isl_take isl_constraint * c, void * user){
-
-  sch_info * sch = (sch_info *) user; 
-  
-  //isl_constraint_dump(c);
-  if(isl_constraint_involves_dims(c, isl_dim_out, sch->d * 2, 1)){
-    isl_val * val = isl_constraint_get_constant_val(c);
-    val = isl_val_sub_ui(val, sch->i); //output dim plus 1
-    c = isl_constraint_set_constant_val(c, val);
-    sch->bmap = isl_basic_map_add_constraint(sch->bmap, isl_constraint_copy(c));
-  }  
-  
-  isl_constraint_free(c);
-  return 0;
-}
-
-
-int modify_schedule(__isl_take isl_basic_map * bmap, void * user){
-
-  sch_info * sch = (sch_info *) user;
-
-  sch->bmap = isl_basic_map_copy(bmap); 
-  sch->bmap = isl_basic_map_drop_constraints_involving_dims(sch->bmap, isl_dim_out, sch->d * 2, 1);
-  
-  int s1 = isl_basic_map_foreach_constraint(bmap, inc_dim, sch);
-
-  sch->sch_map = isl_map_from_basic_map(sch->bmap);
-  
-  isl_basic_map_free(bmap); 
-  return 0;
-}
-
-
-int change_stmt_id(__isl_keep pet_expr *expr, void *user){
-
-  isl_id * p_id = (isl_id *) user;
-
-  isl_map * acc_map = pet_expr_access_get_access(expr);
-  acc_map = isl_map_set_tuple_id(acc_map, isl_dim_in, isl_id_copy(p_id));
-  expr = pet_expr_access_set_access(expr, acc_map);
-  
-  return 0;
-}
 
 // compare bound pair
 int cmp_bound_pair(__isl_take isl_constraint * lw, __isl_take isl_constraint * up, __isl_take isl_basic_set * bset, void * user){
@@ -1018,7 +948,10 @@ int check_dim_single(__isl_keep isl_set * dom, int pos){
   int s1 = isl_set_foreach_basic_set(dom, scan_bset_for_single_dim, &bd);
 
   //std::cout << "*** dom splitted dim is single-valued: " << ds << std::endl;
-  return !(bd.has_not_single);  //sensitive to any bset not single
+
+  //sensitive to any bset not single
+  //empty set will get 1 as well !!!
+  return !(bd.has_not_single);  
 }
 
 // seperate single basic sets 
@@ -1040,6 +973,40 @@ int seperate_singles(__isl_take isl_basic_set *bset, void *user){
   return 0;
 }
 
+
+
+int inc_dim(__isl_take isl_constraint * c, void * user){
+
+  sch_info * sch = (sch_info *) user; 
+  
+  //isl_constraint_dump(c);
+  if(isl_constraint_involves_dims(c, isl_dim_out, sch->d * 2, 1)){
+    isl_val * val = isl_constraint_get_constant_val(c);
+    val = isl_val_sub_ui(val, sch->i); //output dim plus 1
+    c = isl_constraint_set_constant_val(c, val);
+    sch->bmap = isl_basic_map_add_constraint(sch->bmap, isl_constraint_copy(c));
+  }  
+  
+  isl_constraint_free(c);
+  return 0;
+}
+
+
+int modify_schedule(__isl_take isl_basic_map * bmap, void * user){
+
+  sch_info * sch = (sch_info *) user;
+
+  sch->bmap = isl_basic_map_copy(bmap); 
+  sch->bmap = isl_basic_map_drop_constraints_involving_dims(sch->bmap, isl_dim_out, sch->d * 2, 1);
+  
+  int s1 = isl_basic_map_foreach_constraint(bmap, inc_dim, sch);
+
+  sch->sch_map = isl_map_from_basic_map(sch->bmap);
+  
+  isl_basic_map_free(bmap); 
+  return 0;
+}
+
 // for schedule map splitting
 __isl_give isl_map * sch_inc(__isl_keep isl_map * stmt_sch, __isl_keep isl_set * dom, __isl_keep isl_id * stmt_id, int pos, int i){
   // ?? Problem: scheduling map does not make the loop generated as its tree structre
@@ -1050,6 +1017,70 @@ __isl_give isl_map * sch_inc(__isl_keep isl_map * stmt_sch, __isl_keep isl_set *
   int s1 = isl_map_foreach_basic_map(stmt_sch, modify_schedule, &sch);
   sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));  
   return isl_map_intersect_domain(sch.sch_map, isl_set_copy(dom));
+}
+
+
+int dim_zero(__isl_take isl_constraint * c, void * user){
+
+  int * pos = (int *) user;
+
+  int z = 0;
+  if(isl_constraint_involves_dims(c, isl_dim_out, (*pos+1) * 2, 1)){
+    isl_val * val = isl_constraint_get_constant_val(c);
+    z = z - isl_val_is_zero(val);
+    isl_val_free(val);
+  }
+  isl_constraint_free(c);
+  return z;
+}
+
+int check_bmap_sch_dim(__isl_take isl_basic_map * bmap, void * user){
+
+  int s1 = isl_basic_map_foreach_constraint(bmap, dim_zero, user);
+  isl_basic_map_free(bmap);
+  return s1;  
+}
+
+// check current schedule is the first at the dim to be splitted
+int sch_dim_zero(__isl_keep isl_map * sch, int pos){
+
+  int s1 = isl_map_foreach_basic_map(sch, check_bmap_sch_dim, &pos);
+
+  // -1 for found zero
+  if(s1 == -1){
+    return 1;
+  }
+  else{
+    return 0;
+  }
+}
+
+
+int drop_cst(__isl_take isl_constraint * c, void * user){
+  par_info * p = (par_info *) (user);
+  // drop conflict region related parameter constraints
+  // local space must be same
+  p->b = isl_basic_set_drop_constraint(p->b, c);
+  return 0;
+}
+
+int remove_param(__isl_take isl_basic_set * bset, void * user){
+  int s1 = isl_basic_set_foreach_constraint(bset, drop_cst, user);
+  isl_basic_set_free(bset);
+  return 0;
+}
+
+int scan_bset(__isl_take isl_basic_set * bset, void * user){
+
+  par_info * p = (par_info *) (user);
+
+  p->b = isl_basic_set_copy(bset);  
+  int s1 = isl_set_foreach_basic_set(p->param, remove_param, p);
+  //isl_basic_set_dump(p->b);
+  p->dom = isl_set_union(p->dom, isl_set_from_basic_set(p->b));
+  
+  isl_basic_set_free(bset);
+  return 0;
 }
 
 // remove conflict region related parameter constraints
@@ -1065,6 +1096,18 @@ __isl_give isl_set * remove_param_cft(__isl_take isl_set * dom, __isl_keep isl_s
   isl_set_free(p.param);
   p.dom = isl_set_remove_redundancies(p.dom); 
   return isl_set_coalesce(p.dom);
+}
+
+
+int change_stmt_id(__isl_keep pet_expr *expr, void *user){
+
+  isl_id * p_id = (isl_id *) user;
+
+  isl_map * acc_map = pet_expr_access_get_access(expr);
+  acc_map = isl_map_set_tuple_id(acc_map, isl_dim_in, isl_id_copy(p_id));
+  expr = pet_expr_access_set_access(expr, acc_map);
+  
+  return 0;
 }
 
 
@@ -1394,34 +1437,52 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "\n================= Modify SCoP =================" << std::endl;
     int ui_st = scop->n_stmt;
     scop->n_stmt = scop->n_stmt + 2;
-    
+
+    // alloc new space
     isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[i_st]->body);
     scop->stmts = isl_realloc(ctx, scop->stmts, struct pet_stmt *, sizeof(struct pet_stmt *) * scop->n_stmt);
 
+    // whether the first stmt at the splitting dim of stmt schedule map
+    int sch_dim_first = sch_dim_zero(stmt_sch, i_dim);
+    std::cout << "===== Current stmt sch at the splitting dim is zero: " << sch_dim_first << std::endl;
+
+    //assert(false);
+    
     // Part 1
     std::cout << "\n======= Part 1 " << std::endl;
     std::cout << "*** Domain: " << std::endl;
     isl_id * stmt_id = isl_set_get_tuple_id(scop->stmts[i_st]->domain);
 
-    // for unflatten loop when cut point is at the end of dim
-    if(i_st == 0 && ds_cft == 1 && ds_3 == 1){
+    // apply id label for apply pragma
+    isl_id * p_id;
+    if(sch_dim_first == 1){
       std::string p1_str;
-      p1_str.assign(isl_id_get_name(stmt_id));
-      p1_str.append("_unflt");
-      isl_id_free(stmt_id);
-      stmt_id = isl_id_alloc(ctx, p1_str.c_str(), NULL);
+      if(ds_cft == 1 && ds_3 == 1){
+	// for unflatten loop when cut point is at the end of dim
+	p1_str.append("unflt_");
+      }
+      else{
+	p1_str.assign("p1_");
+      }
+      p1_str.append(isl_id_get_name(stmt_id));		   
+      p_id = isl_id_alloc(ctx, p1_str.c_str(), NULL);
     }
-    
-    dom_1 = isl_set_set_tuple_id(dom_1, isl_id_copy(stmt_id));
+    else{
+      p_id = isl_id_copy(stmt_id);
+    }
+
+    // add p1 id
+    dom_1 = isl_set_set_tuple_id(dom_1, isl_id_copy(p_id));
     isl_set_free(scop->stmts[i_st]->domain);
     scop->stmts[i_st]->domain = isl_set_copy(dom_1);
     isl_set_dump(scop->stmts[i_st]->domain);
     //isl_set_free(dom_2);
   
     std::cout << "*** Schedule: " << std::endl;
-    scop->stmts[i_st]->schedule = sch_inc(stmt_sch, dom_1, stmt_id, i_dim, 1);
+    scop->stmts[i_st]->schedule = sch_inc(stmt_sch, dom_1, p_id, i_dim, 1);
     isl_map_dump(scop->stmts[i_st]->schedule);
-  
+    isl_id_free(p_id);
+    
     // Part 2
     std::cout << "\n======= Part 2 " << std::endl;
     scop->stmts[ui_st] = isl_alloc_type(ctx, struct pet_stmt);
@@ -1444,14 +1505,14 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "*** Domain: " << std::endl;
     // set specific id name for the first splitted stmt
     std::string p2_str;
-    if(i_st == 0){
-      p2_str.assign("p2");
+    if(sch_dim_first == 1){
+      p2_str.assign("p2_");
     }
     else{
-      p2_str.assign(isl_id_get_name(stmt_id));
-      p2_str.append("_p2");
+      p2_str.assign("flw_p2_");
     }
-    isl_id * p_id = isl_id_alloc(ctx, p2_str.c_str(), NULL);
+    p2_str.append(isl_id_get_name(stmt_id));
+    p_id = isl_id_alloc(ctx, p2_str.c_str(), NULL);
     dom_2 = isl_set_set_tuple_id(dom_2, isl_id_copy(p_id));
     //dom_2 = isl_set_set_tuple_id(dom_2, isl_id_copy(stmt_id));
     scop->stmts[ui_st]->domain = isl_set_copy(dom_2);  
@@ -1488,13 +1549,13 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "*** Domain: " << std::endl;
     // set specific id name for the first splitted stmt
     std::string p3_str;
-    if(i_st == 0){
-      p3_str.assign("p3");
+    if(sch_dim_first == 1){
+      p3_str.assign("p3_");
     }
     else{
-      p3_str.assign(isl_id_get_name(stmt_id));
-      p3_str.append("_p3");
+      p3_str.assign("flw_p3_");
     }
+    p3_str.append(isl_id_get_name(stmt_id));
     p_id = isl_id_alloc(ctx, p3_str.c_str(), NULL);
     dom_3 = isl_set_set_tuple_id(dom_3, isl_id_copy(p_id));
     //dom_3 = isl_set_set_tuple_id(dom_3, isl_id_copy(stmt_id));
@@ -1525,6 +1586,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "==================== End statement in SCoP: "<< i_st << " ===================" << std::endl;
   }
 
+  //assert(false);
+  
   for(int i_st=0; i_st<n_stmt; i_st++){
     isl_set_free(stmt_dom_rcd[i_st]);
   }

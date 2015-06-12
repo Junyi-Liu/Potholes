@@ -665,10 +665,10 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
 
     const char * id_str = isl_id_get_name(tuple_id);
     std::cout << "=== ast generation for stmt : " << id_str << std::endl;
-    int p1 = strcmp(id_str, "S_0");
-    int p2 = strcmp(id_str, "p2");
-    int p3 = strcmp(id_str, "p3");
-    int p1_unflt = strcmp(id_str, "S_0_unflt"); 
+    int p1 = strncmp(id_str, "p1", 2);
+    int p2 = strncmp(id_str, "p2", 2);
+    int p3 = strncmp(id_str, "p3", 2);
+    int unflt = strncmp(id_str, "unflt", 5); 
     //isl_id_dump(tuple_id);   
 
     // generate ast_stmt
@@ -685,9 +685,8 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
     else if(scop->t == 2){
       // FOR LOOP SPLITTING  
-      if( p1==0 || p3==0 || p1_unflt==0){
-	stmt->t = 1; // fast pipelining
-	
+      if( p1==0 || p3==0 || unflt==0){
+	stmt->t = 1; // fast pipelining	
       }
       else if(p2==0){
 	stmt->t = 0; // default pipelining
@@ -701,7 +700,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
 
     // apply unflatten loop
-    if(p1_unflt==0){
+    if(unflt==0){
       stmt->unflt = 1;
     }
     
