@@ -781,7 +781,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   if(stmt->unflt == 1){
     std::cout << "printing pragma for unflatten loop"<< std::endl;
     std::stringstream ss;
-    ss << "#pragma HLS loop_faltten off";
+    ss << "#pragma HLS LOOP_FLATTEN off";
     printer = isl_printer_start_line(printer);    
     printer = isl_printer_print_str(printer, ss.str().c_str());
     printer = isl_printer_end_line(printer);  
