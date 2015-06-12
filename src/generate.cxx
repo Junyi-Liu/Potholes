@@ -665,9 +665,10 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
 
     const char * id_str = isl_id_get_name(tuple_id);
     std::cout << "=== ast generation for stmt : " << id_str << std::endl;
-    int p1 = !strcmp(id_str, "S_0");
-    int p2 = !strcmp(id_str, "p2");
-    int p3 = !strcmp(id_str, "p3");
+    int p1 = strcmp(id_str, "S_0");
+    int p2 = strcmp(id_str, "p2");
+    int p3 = strcmp(id_str, "p3");
+    int p1_unflt = strcmp(id_str, "S_0_unflt"); 
     //isl_id_dump(tuple_id);   
 
     // generate ast_stmt
@@ -684,10 +685,11 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
     else if(scop->t == 2){
       // FOR LOOP SPLITTING  
-      if( p1 || p3 ){
+      if( p1==0 || p3==0 || p1_unflt==0){
 	stmt->t = 1; // fast pipelining
+	
       }
-      else if(p2){
+      else if(p2==0){
 	stmt->t = 0; // default pipelining
       }
       else{
@@ -698,6 +700,11 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
       stmt->t = 2;
     }
 
+    // apply unflatten loop
+    if(p1_unflt==0){
+      stmt->unflt = 1;
+    }
+    
     // append id name with statement number for correct printing based on unique ids 
     isl_ctx * ctx = isl_id_get_ctx(tuple_id);
     std::stringstream ss;
@@ -771,6 +778,16 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
     printer = isl_printer_end_line(printer);    
   }
 
+  // unflatten loop pragma
+  if(stmt->unflt == 1){
+    std::cout << "printing pragma for unflatten loop"<< std::endl;
+    std::stringstream ss;
+    ss << "#pragma HLS loop_faltten off";
+    printer = isl_printer_start_line(printer);    
+    printer = isl_printer_print_str(printer, ss.str().c_str());
+    printer = isl_printer_end_line(printer);  
+  }
+  
   std::cout << "Printing loop statements "<< std::endl;
 
   printer = isl_printer_start_line(printer);

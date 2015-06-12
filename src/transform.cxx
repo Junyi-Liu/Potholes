@@ -970,12 +970,12 @@ int change_stmt_id(__isl_keep pet_expr *expr, void *user){
 int cmp_bound_pair(__isl_take isl_constraint * lw, __isl_take isl_constraint * up, __isl_take isl_basic_set * bset, void * user){
 
   bd_info * bd = (bd_info *) user;
-  std::cout <<"-- lower bd: " << std::endl; 
+  //std::cout <<"-- lower bd: " << std::endl; 
   bd->min = isl_constraint_get_bound(lw, isl_dim_set, bd->dim);
-  isl_aff_dump(bd->min);
-  std::cout <<"-- upper bd: " << std::endl; 
+  //isl_aff_dump(bd->min);
+  //std::cout <<"-- upper bd: " << std::endl; 
   bd->max = isl_constraint_get_bound(up, isl_dim_set, bd->dim);
-  isl_aff_dump(bd->max);
+  //isl_aff_dump(bd->max);
 
   int ds = isl_aff_plain_is_equal(bd->max, bd->min);
   if(ds) bd->has_single = 1;
@@ -995,6 +995,7 @@ int scan_bset_for_single_dim(__isl_take isl_basic_set *bset, void *user){
 
   bd_info * bd = (bd_info *) user;
 
+  //isl_basic_set_dump(bset);
   //check each bset
   int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, bd->dim, cmp_bound_pair, bd);
 
@@ -1079,22 +1080,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   // dimension number of conflict set
   int n_cd = isl_set_dim(rlt->cft, isl_dim_set);
 
-  int ds_cft = 0;
-  for(int i=0; i<n_cd; i++){
-    ds_cft += check_dim_single(rlt->cft, i);
-  }
-
-  isl_set * pnt_lexmin;
-  isl_set * pnt_lexmax;
-  if(ds_cft == n_cd){
-    std::cout << "==== All dims of cft are single ==== " << std::endl;
-    pnt_lexmin = isl_set_copy(rlt->cft);
-    pnt_lexmax = isl_set_copy(rlt->cft);
-  }
-  else{
-    pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
-    pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
-  }
+  // Take lex points
+  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
+  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
   std::cout << "==== lexmin point: " << std::endl;   
   isl_set_dump(pnt_lexmin); 
   std::cout << "==== lexmax point: " << std::endl;     
@@ -1123,8 +1111,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // Copy statement schedule
     isl_map * stmt_sch = isl_map_copy(scop->stmts[i_st]->schedule);
 
-    // Detect which dimension to be splitted
+    // Detect which dimension to be splitted, by lex point comparison
     // more complex cases need for this part!
+    std::cout << "==== Search dimension to be splitted " << std::endl;
     int n_dd = isl_set_dim(stmt_dom, isl_dim_set);
     int n_d = (n_cd < n_dd) ? n_cd : n_dd;
     isl_pw_aff * cd_min;
@@ -1145,13 +1134,48 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       isl_pw_aff_free(dd_min);
       isl_pw_aff_free(dd_max);
       if(eq_min == 0 || eq_max == 0){
-	i_dim = i;
-	break;
+    	i_dim = i;
+    	break;
       }
     }
+
+    // detect bound aff
+    // int n_sd = isl_set_dim(stmt_dom, isl_dim_set);
+    // int n_d = (n_cd < n_sd) ? n_cd : n_sd;
+    // int i_dim = -1;
+    // //int n_d = (n_cd < n_sd) ? n_cd : n_sd;
+    // isl_aff * s_dsize;
+    // isl_aff * c_dsize;
+    // int eq_d;
+    // for(int i = n_d-1; i >= 0; i--){
+    //   std::cout << "*** Dim : " << i << " ***"<< std::endl;
+    //   std::cout << "** stmt : "  << std::endl;
+    //   s_dsize = get_dim_size(stmt_dom, i);
+    //   std::cout << "** cft : " << std::endl;
+    //   c_dsize = get_dim_size(rlt->cft, i);
+    //   eq_d = isl_aff_plain_is_equal(s_dsize, c_dsize);
+    //   isl_aff_free(s_dsize);
+    //   isl_aff_free(c_dsize);
+    //   if(eq_d == 0){
+    // 	i_dim = i;
+    // 	break;
+    //   }
+    // }
+    
     std::cout << "==== Dimension to be splitted: " << i_dim << std::endl;
 
-    std::cout << "==== eq_max: " << eq_max << std::endl;
+    // no need to cut current dom, skip to next stmt
+    if(i_dim == -1){
+      isl_set_free(stmt_dom);
+      isl_map_free(stmt_sch);
+      continue;
+    }
+
+    int ds_cft = check_dim_single(rlt->cft, i_dim); //found any single dim 
+    if(ds_cft){
+      std::cout << "==== The dim will be splitted by one point ==== " << std::endl;
+    }
+   
     //assert(false);
     
     // Cut inner most loop bounds by the LEXMAX point
@@ -1161,7 +1185,13 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     info.stmt_dom = isl_set_copy(stmt_dom);
     //info.new_dom = isl_set_copy(stmt_dom);
     info.n_bst = 0;
-    int s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, &info);
+    int s1;
+    if(ds_cft){
+      s1 = isl_set_foreach_basic_set(rlt->cft, constraint_scan, &info);
+    }
+    else{
+      s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, &info);
+    }
     isl_set * dom_lexmax = isl_set_copy(info.new_dom);
     std::cout << "======= End domain cut by lexmax of conflict region =======" << std::endl;
     isl_set_dump(dom_lexmax);
@@ -1171,7 +1201,12 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     std::cout << "\n======= Start domain cut by lexmin of conflict region ======" << std::endl;
     //info.new_dom = isl_set_copy(stmt_dom);
     info.n_bst = 0;
-    s1 = isl_set_foreach_basic_set(pnt_lexmin, constraint_scan, &info);
+    if(ds_cft){
+      s1 = isl_set_foreach_basic_set(rlt->cft, constraint_scan, &info);
+    }
+    else{
+      s1 = isl_set_foreach_basic_set(pnt_lexmin, constraint_scan, &info);
+    }
     isl_set * dom_lexmin = isl_set_copy(info.new_dom);
     std::cout << "======= End domain cut by lexmin of conflict region ======" << std::endl;
     isl_set_dump(dom_lexmin);
@@ -1180,6 +1215,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // check whether splitted dim is single valued
     int ds_lexmin = check_dim_single(dom_lexmin, i_dim);
+    std::cout << "==== dom_lexmin dim is single: " << ds_lexmin << std::endl;
     
 
     // Set Subtraction
@@ -1195,6 +1231,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // check whether splitted dim is single valued
     int ds_3 = check_dim_single(dom_3, i_dim);
+    std::cout << "==== dom_3 dim is single: " << ds_3 << std::endl;
     if(ds_3 == 1){
       isl_set_free(dom_3);
       dom_3 = isl_set_empty(isl_set_get_space(stmt_dom));
@@ -1250,8 +1287,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     dom_1 = isl_set_remove_redundancies(dom_1);
     dom_1 = isl_set_coalesce(dom_1);
     isl_set_dump(dom_1);
-
-    // Special Case: dom_1 and dom_3 are all empty
+    
+    // Check bset number
     int n_bs_1 = isl_set_n_basic_set(dom_1);
     int n_bs_2 = isl_set_n_basic_set(dom_2);
     int n_bs_3 = isl_set_n_basic_set(dom_3);
@@ -1265,6 +1302,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       t = 0;
     }
     if(ds_lexmin == 1 && ds_3 == 1){
+      // Special Case: dom_1 and dom_3 are all empty
       std::cout << "==== Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
       t = 1;
     }
@@ -1363,7 +1401,17 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // Part 1
     std::cout << "\n======= Part 1 " << std::endl;
     std::cout << "*** Domain: " << std::endl;
-    isl_id * stmt_id = isl_set_get_tuple_id(scop->stmts[i_st]->domain);    
+    isl_id * stmt_id = isl_set_get_tuple_id(scop->stmts[i_st]->domain);
+
+    // for unflatten loop when cut point is at the end of dim
+    if(i_st == 0 && ds_cft == 1 && ds_3 == 1){
+      std::string p1_str;
+      p1_str.assign(isl_id_get_name(stmt_id));
+      p1_str.append("_unflt");
+      isl_id_free(stmt_id);
+      stmt_id = isl_id_alloc(ctx, p1_str.c_str(), NULL);
+    }
+    
     dom_1 = isl_set_set_tuple_id(dom_1, isl_id_copy(stmt_id));
     isl_set_free(scop->stmts[i_st]->domain);
     scop->stmts[i_st]->domain = isl_set_copy(dom_1);

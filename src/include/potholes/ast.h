@@ -80,9 +80,11 @@ struct pth_ast_stmt {
   isl_id * id;
   pth_stmt_type type;
 
-  // check wether printed for transformation
+  // check whether print for fast pipeline pragma
   int t;
-    
+  // check whether print disable loop flatten pragma
+  int unflt = 0;
+  
   union { 
     struct { 
       pth_ast_node * lhs;
