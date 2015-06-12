@@ -897,6 +897,7 @@ int constraint_scan(__isl_take isl_basic_set * bset, void * user){
 
 
 // compare bound pair
+// problem: if there is eq_cst on dim, other ineq_cst will be neglected
 int cmp_bound_pair(__isl_take isl_constraint * lw, __isl_take isl_constraint * up, __isl_take isl_basic_set * bset, void * user){
 
   bd_info * bd = (bd_info *) user;
@@ -920,6 +921,28 @@ int cmp_bound_pair(__isl_take isl_constraint * lw, __isl_take isl_constraint * u
   return 0;
 }
 
+int find_ineq_cst(__isl_take isl_constraint * c, void * user){
+
+  bd_info * bd = (bd_info *) user;
+
+  int eq;
+  if(isl_constraint_involves_dims(c, isl_dim_set, bd->dim, 1)){
+    // find constraint is not equality
+    eq = isl_constraint_is_equality(c);
+    isl_constraint_free(c);  
+    if(eq){
+      return 0;
+    }
+    else{
+      return -1;
+    }
+  }
+
+  isl_constraint_free(c);  
+  return 0;
+
+}
+
 // Scan bset for single dim
 int scan_bset_for_single_dim(__isl_take isl_basic_set *bset, void *user){
 
@@ -927,22 +950,23 @@ int scan_bset_for_single_dim(__isl_take isl_basic_set *bset, void *user){
 
   //isl_basic_set_dump(bset);
   //check each bset
-  int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, bd->dim, cmp_bound_pair, bd);
+  //int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, bd->dim, cmp_bound_pair, bd);
+  int s1 = isl_basic_set_foreach_constraint(bset, find_ineq_cst, bd);
 
   isl_basic_set_free(bset);
-  return 0;
+  return s1;
 }
 
 // check whether the specific dimension of the set is single-valued
 int check_dim_single(__isl_keep isl_set * dom, int pos){
 
   // first check by lex points
-  isl_pw_aff * dim_min = isl_set_dim_min(isl_set_copy(dom), pos); 
-  isl_pw_aff * dim_max = isl_set_dim_max(isl_set_copy(dom), pos);
-  int ds = isl_pw_aff_is_equal(dim_min, dim_max);
-  isl_pw_aff_free(dim_min);
-  isl_pw_aff_free(dim_max);
-
+  // isl_pw_aff * dim_min = isl_set_dim_min(isl_set_copy(dom), pos); 
+  // isl_pw_aff * dim_max = isl_set_dim_max(isl_set_copy(dom), pos);
+  // int ds = isl_pw_aff_is_equal(dim_min, dim_max);
+  // isl_pw_aff_free(dim_min);
+  // isl_pw_aff_free(dim_max);
+  
   // second check by dim bounds
   //sensitive to any bset not single
   //empty set will get 1 as well !!!
@@ -952,7 +976,8 @@ int check_dim_single(__isl_keep isl_set * dom, int pos){
   bd.dim = pos;
   int s1 = isl_set_foreach_basic_set(dom, scan_bset_for_single_dim, &bd);
 
-  if(ds == 1 && bd.has_not_single == 0){
+  //if(ds == 1 && bd.has_not_single == 0){
+  if(s1 == 0){  
     return 1;
   }
   else{
@@ -1221,9 +1246,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
 
     int ds_cft = check_dim_single(rlt->cft, i_dim); //found any single dim
-    if(ds_cft){
-      std::cout << "==== The dim will be splitted by one point ==== " << std::endl;
-    }
+    std::cout << "==== The dim will be splitted by one point : " << ds_cft << std::endl;
    
     //assert(false);
     
