@@ -1486,7 +1486,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     isl_id * p_id;
     if(sch_dim_first == 1){
       std::string p1_str;
-      if(ds_cft == 1 && ds_3 == 1){
+      if((ds_cft == 1) && (ds_3 == 1)){
 	// for unflatten loop when cut point is at the end of dim
 	p1_str.assign("unflt_");
 	//assert(false);
