@@ -703,6 +703,9 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     if(unflt==0){
       stmt->unflt = 1;
     }
+    else{
+      stmt->unflt = 0;
+    }
     
     // append id name with statement number for correct printing based on unique ids 
     isl_ctx * ctx = isl_id_get_ctx(tuple_id);
