@@ -945,9 +945,19 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
     // not able to apply transformation
     std::cout << "\n*********** NO SAFE REGION FOUND ****************" << std::endl;
+#ifdef PLP
     std::cout << "Keep original codes " << std::endl;
     sw = 0;
     scop->t = 0;
+#endif
+    
+#ifdef LSP
+    // add pragmas for loop splitting
+    std::cout << "Apply pragma for loop splitting" << std::endl;
+    sw = 0;
+    scop->t = 2;
+#endif
+    
   }
   else if(isl_set_plain_is_universe(rlt.param)){
     // always in safe range, add pragma for fast pipeline

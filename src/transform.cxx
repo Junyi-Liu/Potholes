@@ -1017,7 +1017,7 @@ int inc_dim(__isl_take isl_constraint * c, void * user){
   sch_info * sch = (sch_info *) user; 
   
   //isl_constraint_dump(c);
-  if(isl_constraint_involves_dims(c, isl_dim_out, sch->d * 2, 1)){
+  if(isl_constraint_involves_dims(c, isl_dim_out, (sch->d+1) * 2, 1)){
     isl_val * val = isl_constraint_get_constant_val(c);
     val = isl_val_sub_ui(val, sch->i); //output dim plus 1
     c = isl_constraint_set_constant_val(c, val);
@@ -1029,12 +1029,12 @@ int inc_dim(__isl_take isl_constraint * c, void * user){
 }
 
 
-int modify_schedule(__isl_take isl_basic_map * bmap, void * user){
+int sch_inc(__isl_take isl_basic_map * bmap, void * user){
 
   sch_info * sch = (sch_info *) user;
 
   sch->bmap = isl_basic_map_copy(bmap); 
-  sch->bmap = isl_basic_map_drop_constraints_involving_dims(sch->bmap, isl_dim_out, sch->d * 2, 1);
+  sch->bmap = isl_basic_map_drop_constraints_involving_dims(sch->bmap, isl_dim_out, (sch->d+1) * 2, 1);
   
   int s1 = isl_basic_map_foreach_constraint(bmap, inc_dim, sch);
 
@@ -1045,13 +1045,16 @@ int modify_schedule(__isl_take isl_basic_map * bmap, void * user){
 }
 
 // for schedule map splitting
-__isl_give isl_map * sch_inc(__isl_keep isl_map * stmt_sch, __isl_keep isl_set * dom, __isl_keep isl_id * stmt_id, int pos, int i){
+__isl_give isl_map * sch_modify(__isl_keep isl_map * stmt_sch, __isl_keep isl_set * dom, __isl_keep isl_id * stmt_id, int pos, int i){
   // ?? Problem: scheduling map does not make the loop generated as its tree structre
-  // ?? Currently just use same schedule map for the splitted inner loops 
+ 
   sch_info sch;
   sch.d = pos;
   sch.i = i;
-  int s1 = isl_map_foreach_basic_map(stmt_sch, modify_schedule, &sch);
+
+  //int s1 = isl_map_foreach_basic_map(stmt_sch, sch_inc, &sch);
+  sch.sch_map = isl_map_copy(stmt_sch); // use same schedule
+    
   sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));  
   return isl_map_intersect_domain(sch.sch_map, isl_set_copy(dom));
 }
@@ -1161,12 +1164,12 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   int n_cd = isl_set_dim(rlt->cft, isl_dim_set);
 
   // Take lex points
-  isl_set * pnt_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
-  isl_set * pnt_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
+  isl_set * cft_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
+  isl_set * cft_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
   std::cout << "==== lexmin point: " << std::endl;   
-  isl_set_dump(pnt_lexmin); 
+  isl_set_dump(cft_lexmin); 
   std::cout << "==== lexmax point: " << std::endl;     
-  isl_set_dump(pnt_lexmax);
+  isl_set_dump(cft_lexmax);
 
   
   //assert(false);
@@ -1190,7 +1193,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // Copy statement schedule
     isl_map * stmt_sch = isl_map_copy(scop->stmts[i_st]->schedule);
-
+    
     // Detect which dimension to be splitted, by lex point comparison
     // more complex cases need for this part!
     std::cout << "==== Search dimension to be splitted " << std::endl;
@@ -1203,9 +1206,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     int eq_min, eq_max;
     int i_dim = -1;
     for(int i = n_d-1; i >= 0; i--){
-      cd_min = isl_set_dim_min(isl_set_copy(pnt_lexmin), i); 
+      cd_min = isl_set_dim_min(isl_set_copy(cft_lexmin), i); 
       dd_min = isl_set_dim_min(isl_set_copy(stmt_dom), i);
-      cd_max = isl_set_dim_max(isl_set_copy(pnt_lexmax), i); 
+      cd_max = isl_set_dim_max(isl_set_copy(cft_lexmax), i); 
       dd_max = isl_set_dim_max(isl_set_copy(stmt_dom), i);
       eq_min = isl_pw_aff_is_equal(cd_min, dd_min); 
       eq_max = isl_pw_aff_is_equal(cd_max, dd_max);
@@ -1251,7 +1254,25 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       continue;
     }
 
-    int ds_cft = check_dim_single(rlt->cft, i_dim); //found any single dim
+
+    // Match iterators
+    unsigned len = (n_cd < n_dd) ? (n_dd - n_cd) : (n_cd - n_dd);
+    isl_set * cft;
+    isl_set * pnt_lexmin;
+    isl_set * pnt_lexmax;  
+    if(n_cd != n_dd){
+      cft = isl_set_remove_dims(isl_set_copy(rlt->cft), isl_dim_set, n_d, len);
+      pnt_lexmin = isl_set_remove_dims(isl_set_copy(cft_lexmin), isl_dim_set, n_d, len);
+      pnt_lexmax = isl_set_remove_dims(isl_set_copy(cft_lexmax), isl_dim_set, n_d, len);
+    }
+    else{
+      cft = isl_set_copy(rlt->cft);
+      pnt_lexmin = isl_set_copy(cft_lexmin);
+      pnt_lexmax = isl_set_copy(cft_lexmax);	
+    }
+
+    // detect single dim in conflict region
+    int ds_cft = check_dim_single(cft, i_dim); //found any single dim
     std::cout << "==== The dim will be splitted by one point : " << ds_cft << std::endl;
    
     //assert(false);
@@ -1265,7 +1286,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     info.n_bst = 0;
     int s1;
     if(ds_cft){
-      s1 = isl_set_foreach_basic_set(rlt->cft, constraint_scan, &info);
+      s1 = isl_set_foreach_basic_set(cft, constraint_scan, &info);
     }
     else{
       s1 = isl_set_foreach_basic_set(pnt_lexmax, constraint_scan, &info);
@@ -1280,7 +1301,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     //info.new_dom = isl_set_copy(stmt_dom);
     info.n_bst = 0;
     if(ds_cft){
-      s1 = isl_set_foreach_basic_set(rlt->cft, constraint_scan, &info);
+      s1 = isl_set_foreach_basic_set(cft, constraint_scan, &info);
     }
     else{
       s1 = isl_set_foreach_basic_set(pnt_lexmin, constraint_scan, &info);
@@ -1515,7 +1536,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     //isl_set_free(dom_2);
   
     std::cout << "*** Schedule: " << std::endl;
-    scop->stmts[i_st]->schedule = sch_inc(stmt_sch, dom_1, p_id, i_dim, 1);
+    scop->stmts[i_st]->schedule = sch_modify(stmt_sch, dom_1, p_id, i_dim, 1);
     isl_map_dump(scop->stmts[i_st]->schedule);
     isl_id_free(p_id);
     
@@ -1555,7 +1576,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     isl_set_dump(scop->stmts[ui_st]->domain);
 
     std::cout << "*** Schedule: " << std::endl;
-    scop->stmts[ui_st]->schedule = sch_inc(stmt_sch, dom_2, p_id, i_dim, 2);
+    scop->stmts[ui_st]->schedule = sch_modify(stmt_sch, dom_2, p_id, i_dim, 2);
     isl_map_dump(scop->stmts[ui_st]->schedule);
 
     std::cout << "*** Stmt body: " << std::endl;
@@ -1599,7 +1620,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     isl_set_dump(scop->stmts[ui_st+1]->domain);
 
     std::cout << "*** Schedule: " << std::endl;
-    scop->stmts[ui_st+1]->schedule = sch_inc(stmt_sch, dom_3, p_id, i_dim, 3);
+    scop->stmts[ui_st+1]->schedule = sch_modify(stmt_sch, dom_3, p_id, i_dim, 3);
     isl_map_dump(scop->stmts[ui_st+1]->schedule);
 
     std::cout << "*** Stmt body: " << std::endl;
@@ -1617,7 +1638,10 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     isl_map_free(stmt_sch);  
     isl_set_free(dom_lexmax);
     isl_set_free(dom_lexmin);
-
+    isl_set_free(pnt_lexmax);
+    isl_set_free(pnt_lexmin);
+    isl_set_free(cft);
+    
     //isl_ctx_free(ctx);
     std::cout << "==================== End statement in SCoP: "<< i_st << " ===================" << std::endl;
   }
@@ -1627,8 +1651,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   for(int i_st=0; i_st<n_stmt; i_st++){
     isl_set_free(stmt_dom_rcd[i_st]);
   }
-  isl_set_free(pnt_lexmin);
-  isl_set_free(pnt_lexmax);
+  isl_set_free(cft_lexmin);
+  isl_set_free(cft_lexmax);
   return 0;
 }
 
