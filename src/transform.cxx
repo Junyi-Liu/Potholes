@@ -238,8 +238,12 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   isl_set_dump(set);
   //assert(false);
 
+  int d_maff = isl_multi_aff_dim(maff, isl_dim_out);
+
+  d_maff = (stmt->n_it < d_maff) ? stmt->n_it : d_maff;
+  
   // (src-snk) in multi-afffine
-  for(int i=0; i<stmt->n_it; i++){
+  for(int i=0; i<d_maff; i++){
     isl_aff * snk_aff = isl_multi_aff_get_aff(maff, i);
     isl_aff * src_aff = isl_aff_list_get_aff(stmt->src, i);
     //isl_aff_dump(snk_aff);
@@ -263,9 +267,11 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   for(int i=stmt->n_it-1; i>=0; i--){
     std::cout << "* dimension: "<< i << std::endl;
     // add dimension item with factor
-    isl_aff * dim = isl_multi_aff_get_aff(maff, i);
-    dim = isl_aff_mul(dim, isl_aff_copy(ftr));
-    diff = isl_aff_add(diff, dim);    
+    if(i < d_maff){
+      isl_aff * dim = isl_multi_aff_get_aff(maff, i);
+      dim = isl_aff_mul(dim, isl_aff_copy(ftr));
+      diff = isl_aff_add(diff, dim);
+    }
     // scale up factor
     // consider paramterized dim bounds
     if(i>0){
