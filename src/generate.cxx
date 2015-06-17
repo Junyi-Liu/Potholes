@@ -347,7 +347,7 @@ pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build * build, pth_scop * sc
 	 
   case pet_expr_op : {
     // adapt new pet head file
-    if(rhs_expr->n_arg < 3){
+    if(rhs_expr->n_arg < 4){
       output->assign.rhs = pth_ast_node_from_isl_ast_node(isl_ast_node_alloc_user(rhs));
     }
     else {
@@ -426,22 +426,36 @@ isl_ast_expr * pth_generate_ast_expr_arith(pth_ast_build * build, pth_scop * sco
     
   return pth_ast_expr_to_isl_ast_expr(output);
 }
+
+// Junyi: ralational operation generation
 isl_ast_expr * pth_generate_ast_expr_relational(pth_ast_build * build, pth_scop * scop, pet_stmt * stmt, pet_expr * expr, pet_op_type op){
+  
   pth_ast_expr * output;
 
-  assert(false);
+  isl_ast_expr * lhs = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_bin_lhs]);
+  isl_ast_expr * rhs = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_bin_rhs]);
+  
+  //assert(false);
   isl_ctx * ctx = pth_ast_build_get_ctx(build);
+  isl_ast_op_type isl_op;
+  
   switch(op) {
-  case pet_op_eq: output = pth_ast_expr_alloc_op(ctx, isl_ast_op_eq, 2); break;
-  case pet_op_le: output = pth_ast_expr_alloc_op(ctx, isl_ast_op_le, 2); break;
-  case pet_op_lt: output = pth_ast_expr_alloc_op(ctx, isl_ast_op_lt, 2); break;
-  case pet_op_gt: output = pth_ast_expr_alloc_op(ctx, isl_ast_op_gt, 2); break;
+  case pet_op_eq: isl_op = isl_ast_op_eq; break;
+  case pet_op_le: isl_op = isl_ast_op_le; break;
+  case pet_op_ge: isl_op = isl_ast_op_ge; break;
+  case pet_op_lt: isl_op = isl_ast_op_lt; break;
+  case pet_op_gt: isl_op = isl_ast_op_gt; break;
   default : { 
     assert(false);
   }
   }
+
+  output = pth_ast_expr_alloc_binary(isl_op, lhs, rhs);
+  
   return pth_ast_expr_to_isl_ast_expr(output);
 }
+
+
 isl_ast_expr * pth_generate_ast_expr_unary(pth_ast_build * build, pth_scop * scop, pet_stmt * stmt, pet_expr * expr, pet_op_type op) {
   pth_ast_expr * output;  
   assert(false);
@@ -466,6 +480,8 @@ isl_ast_expr * pth_generate_ast_expr_access(pth_ast_build * build, pth_scop * sc
   assert(access_expr);
   return access_expr;
 }
+
+// Binary operations
 isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build * build, pth_scop * scop, pet_stmt * stmt, pet_expr * expr) {
     
   isl_ast_expr * output_expr = NULL;
@@ -484,6 +500,7 @@ isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build * build, pth_scop * sc
   case pet_op_assign: {  
     assert(false);
   } break;
+    
   case pet_op_add: 
   case pet_op_sub: 
   case pet_op_mul: 
@@ -492,17 +509,22 @@ isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build * build, pth_scop * sc
     output_expr = pth_generate_ast_expr_arith(build, scop, stmt, expr, op); 
     assert(output_expr);
   } break;
+    
   case pet_op_eq: 
   case pet_op_le: 
-  case pet_op_lt: ;
+  case pet_op_ge: 
+  case pet_op_lt: 
   case pet_op_gt: { output_expr = pth_generate_ast_expr_relational(build, scop, stmt, expr, op);
       assert(output_expr);
   } break;
+    
   case pet_op_minus: 
   case pet_op_post_inc: 
   case pet_op_post_dec:
   case pet_op_pre_inc: 
-  case pet_op_pre_dec: { output_expr = pth_generate_ast_expr_unary(build, scop, stmt, expr, op);  assert(output_expr);  } break;
+  case pet_op_pre_dec: { output_expr = pth_generate_ast_expr_unary(build, scop, stmt, expr, op);  assert(output_expr);
+  } break;
+    
   case pet_op_address_of: { assert(false); } break;
   case pet_op_kill : { assert(false); } break;
   case pet_op_last : { assert(false); } break;
@@ -510,6 +532,26 @@ isl_ast_expr * pth_generate_ast_expr_binary(pth_ast_build * build, pth_scop * sc
   }
     
   return output_expr;
+}
+
+isl_ast_expr * pth_generate_ast_expr_ternary(pth_ast_build * build, pth_scop * scop, pet_stmt * stmt, pet_expr * expr) {
+
+  pth_ast_expr * output_expr = NULL;
+
+  isl_ast_expr * op_cond = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_ter_cond]); 
+  isl_ast_expr * op_true = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_ter_true]); 
+  isl_ast_expr * op_false = pth_generate_ast_expr(build, scop, stmt, expr->args[pet_ter_false]);
+  
+  pet_op_type op = expr->op;
+
+  switch(op) {
+  case pet_op_cond: {
+    output_expr = pth_ast_expr_alloc_ternary(isl_ast_op_cond, op_cond, op_true, op_false);
+  } break;
+  default : { assert(false); } break;
+  }
+
+  return pth_ast_expr_to_isl_ast_expr(output_expr);
 }
 
 isl_ast_expr * pth_generate_ast_expr(pth_ast_build * build, pth_scop * scop, pth_stmt * stmt, pth_expr * expr){
@@ -553,6 +595,10 @@ isl_ast_expr * pth_generate_ast_expr(pth_ast_build * build, pth_scop * scop, pth
   case pet_expr_op : {
     if(expr->n_arg == 2){
       output = pth_generate_ast_expr_binary(build, scop, stmt, expr); 
+      assert(output);
+    }
+    else if(expr->n_arg == 3){
+      output = pth_generate_ast_expr_ternary(build, scop, stmt, expr); 
       assert(output);
     }
     else{

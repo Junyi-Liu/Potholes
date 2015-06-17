@@ -128,6 +128,37 @@ pth_ast_expr *pth_ast_expr_alloc_binary(enum isl_ast_op_type type, isl_ast_expr 
 
 }
 
+// Junyi:
+/* Create an expression representing the ternary operation "type"
+ * applied to "expr1", "expr2" and "expr3".
+ */
+pth_ast_expr *pth_ast_expr_alloc_ternary(enum isl_ast_op_type type, isl_ast_expr *expr1, isl_ast_expr *expr2, isl_ast_expr *expr3) {
+
+  isl_ctx *ctx;
+  pth_ast_expr *expr = NULL;
+
+  if (!expr1 || !expr2 || !expr3)
+    goto error;
+
+  ctx = isl_ast_expr_get_ctx(expr1);
+  expr = pth_ast_expr_alloc_op(ctx, type, 3);
+  if (!expr)
+    goto error;
+
+  expr->u.op.args[0] = expr1;
+  expr->u.op.args[1] = expr2;
+  expr->u.op.args[2] = expr3;
+  
+  return expr;
+  
+ error:
+  isl_ast_expr_free(expr1);
+  isl_ast_expr_free(expr2);
+  isl_ast_expr_free(expr3);
+  return NULL;
+}
+
+
 pth_ast_node *pth_ast_node_alloc(isl_ctx *ctx,
 				 enum isl_ast_node_type type)
 {

@@ -131,10 +131,15 @@ typedef pth_scop * pth_scop_p;
 pth_scop * pth_scop_insert_stmt(pth_scop *, pth_ast_stmt *);
 
 __isl_give pth_ast_expr *pth_ast_expr_alloc_int_si(isl_ctx *ctx, int i);
+
 __isl_give pth_ast_expr *pth_ast_expr_alloc_op(isl_ctx *ctx,
 	enum isl_ast_op_type op, int n_arg);
 __isl_give pth_ast_expr *pth_ast_expr_alloc_binary(enum isl_ast_op_type type,
 	__isl_take isl_ast_expr *expr1, __isl_take isl_ast_expr *expr2);
+
+// Junyi
+__isl_give pth_ast_expr *pth_ast_expr_alloc_ternary(enum isl_ast_op_type type,
+	__isl_take isl_ast_expr *expr1, __isl_take isl_ast_expr *expr2, __isl_take isl_ast_expr *expr3);
 
 //pth_ast_expr * pth_ast_expr_set_child(pth_ast_expr *, );
 
