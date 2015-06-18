@@ -607,6 +607,12 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
     
     // assign corresponding write access domain
     stmt.domain = isl_set_copy(scop->stmts[acc_wr[j].idx_stmt]->domain);
+    //isl_set_dump(stmt.domain);
+    if(isl_set_is_wrapping(stmt.domain)){
+      stmt.domain = isl_map_domain(isl_set_unwrap(stmt.domain));
+      //isl_set_dump(stmt.domain);
+      //assert(false);      
+    }
 
     std::cout << "==== Schedule: " << std::endl;
     isl_map_dump(scop->stmts[acc_wr[j].idx_stmt]->schedule);
@@ -625,6 +631,11 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
       // assign corresponding read access domain
       stmt.dom_snk = isl_set_copy(scop->stmts[acc_rd[i].idx_stmt]->domain);
+      if(isl_set_is_wrapping(stmt.dom_snk)){
+	stmt.dom_snk = isl_map_domain(isl_set_unwrap(stmt.dom_snk));
+	//isl_set_dump(stmt.dom_snk);
+	//assert(false);      
+      }
       
       // record which read access
       stmt.rd_pos = i;
@@ -1186,6 +1197,11 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // Copy statement domain
     isl_set * stmt_dom = isl_set_copy(scop->stmts[i_st]->domain);
+    isl_set_dump(stmt_dom);
+    if(isl_set_is_wrapping(stmt_dom)){
+      stmt_dom = isl_map_domain(isl_set_unwrap(stmt_dom));      
+    }
+    
     stmt_dom_rcd[i_st] = isl_set_copy(stmt_dom);
     stmt_dom = isl_set_reset_tuple_id(stmt_dom);
     std::cout << "==== Statement domain: " << std::endl;
@@ -1507,7 +1523,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // Part 1
     std::cout << "\n======= Part 1 " << std::endl;
     std::cout << "*** Domain: " << std::endl;
-    isl_id * stmt_id = isl_set_get_tuple_id(scop->stmts[i_st]->domain);
+    isl_id * stmt_id = isl_set_get_tuple_id(stmt_dom_rcd[i_st]);
 
     // apply id label for apply pragma
     isl_id * p_id;

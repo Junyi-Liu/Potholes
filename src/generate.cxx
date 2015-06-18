@@ -279,7 +279,7 @@ pth_ast_stmt * pth_ast_get_scop_statement_by_id(pth_scop * scop, pth_id * ast_st
 pth_ast_stmt * pth_generate_ast_stmt_assign(pth_ast_build * build, pth_scop * scop, pth_id * stmt_id) {
 
   pet_stmt * stmt = pth_get_scop_statement_by_name(scop, stmt_id);
-
+  
   pet_expr * expr = stmt->body->u.e.expr;
   //pet_expr * expr = stmt->body;
   //printf("number of arg: %d \n",expr->n_arg);
@@ -637,6 +637,11 @@ pth_ast_stmt * pth_ast_stmt_alloc(pth_stmt_type type) {
 pth_ast_stmt * pth_generate_ast_stmt(pth_ast_build * build, pth_scop * scop, pth_id * id) {
   pet_stmt * stmt = pth_get_scop_statement_by_name(scop, id);
 
+  if(stmt->n_arg > 0){
+    std::cout << "\n WARNING: loop has data dependent conditions. " << "\n Not supported to generate AST yet.\n" << std::endl;
+    assert(false);
+  }
+  
   pet_expr * expr = pet_tree_expr_get_expr(stmt->body);
         
   if (stmt) {  
@@ -981,7 +986,6 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   analyzeScop(pscop, &vm, &tm, &rlt);
   //isl_set * param = isl_set_copy(rlt.param);
   //isl_set * cft = isl_set_copy(rlt.cft);
-
   
   // Configure transformation
   pth_scop * scop = pth_scop_alloc(pscop); 
@@ -1051,7 +1055,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 #endif
   
   isl_set_free(rlt.cft);  
-  
+
       
   /******************************************
    **  Code Generation
