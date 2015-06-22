@@ -1089,15 +1089,15 @@ int dim_zero(__isl_take isl_constraint * c, void * user){
   int z = 0;
   int n = isl_constraint_dim(c, isl_dim_set);
   
-  for(int i= *pos; (i+1)*2 < n; i++){
-    if(isl_constraint_involves_dims(c, isl_dim_out, (i+1)*2, 1)){
-      isl_val * val = isl_constraint_get_constant_val(c);
-      if(isl_val_is_zero(val) == 0){
-	z = -1;
-      }
-      isl_val_free(val);
-    }    
-  }
+  //for(int i= *pos; (i+1)*2 < n; i++){
+  if(isl_constraint_involves_dims(c, isl_dim_out, n-1, 1)){
+    isl_val * val = isl_constraint_get_constant_val(c);
+    if(isl_val_is_zero(val) == 0){
+      z = -1;
+    }
+    isl_val_free(val);
+  }    
+    //}
   isl_constraint_free(c);
   return z;
 }
@@ -1109,12 +1109,12 @@ int check_bmap_sch_dim(__isl_take isl_basic_map * bmap, void * user){
   return s1;  
 }
 
-// check current schedule is the first at the dim to be splitted
+// check current schedule is the first of its inner-most dim
 int sch_dim_zero(__isl_keep isl_map * sch, int pos){
 
   int s1 = isl_map_foreach_basic_map(sch, check_bmap_sch_dim, &pos);
 
-  // -1 for not found zeros
+  // -1 for found non-zero
   if(s1 == -1){
     return 0;
   }
@@ -1564,9 +1564,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[i_st]->body);
     scop->stmts = isl_realloc(ctx, scop->stmts, struct pet_stmt *, sizeof(struct pet_stmt *) * scop->n_stmt);
 
-    // whether the first stmt at the splitting dim of stmt schedule map
+    // whether the first stmt at its inner-most dim of stmt schedule map
     int sch_dim_first = sch_dim_zero(stmt_sch, i_dim);
-    std::cout << "===== Current stmt sch after the splitting dim are all zeros: " << sch_dim_first << std::endl;
+    std::cout << "===== Current stmt is the first of its inner-most schedule dim: " << sch_dim_first << std::endl;
     isl_map_dump(stmt_sch);
 
     //assert(false);
