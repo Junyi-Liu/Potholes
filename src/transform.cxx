@@ -91,13 +91,16 @@ int acc_expr_info(pet_expr *expr, void *user){
   stmt_info *info = (stmt_info *) (user);
   
   if(expr->n_arg != 0){
-    std::cout << "###cannot analyze wrapped access" << std::endl;
+    pet_expr_dump(expr);
+    std::cout << "### Number of wrapped accesses "<< expr->n_arg << std::endl;
+    std::cout << "### Cannot analyze wrapped access" << std::endl;
     return -1;
   }
 
   isl_map * map = pet_expr_access_get_access(expr);
 
   if(isl_map_has_tuple_name(map, isl_dim_out) == 0){
+    //isl_map_dump(map);
     isl_map_free(map);
     std::cout << "###skip non-array access" << std::endl;
     return 0;
@@ -279,10 +282,17 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
       isl_aff_dump(ftr);
     }
   }
-  std::cout << "* flattened (src-snk): "<< std::endl;
-  isl_aff_dump(diff);
-  isl_aff_free(ftr);  
-  //isl_ctx_free(ctx);
+  
+  if(diff){  
+    std::cout << "* flattened (src-snk): "<< std::endl;
+    isl_aff_dump(diff);
+    isl_aff_free(ftr);  
+    //isl_ctx_free(ctx);
+  }
+  else{
+    std::cout << "\n** Cannot flatten (src-snk), mainly due to the multiplication of iterators or parameters in affine expression  \n"<< std::endl;
+    assert(false);
+  }
   
   // src-snk + L-1 >=0
   std::cout << "** Creating: src-snk + L-1 >=0" << std::endl;
@@ -499,6 +509,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
       return;
     }
   }
+  //assert(false);
   
   // isl_map_dump(scop->stmts[0]->schedule);
 
@@ -1076,10 +1087,16 @@ int dim_zero(__isl_take isl_constraint * c, void * user){
   int * pos = (int *) user;
 
   int z = 0;
-  if(isl_constraint_involves_dims(c, isl_dim_out, (*pos+1) * 2, 1)){
-    isl_val * val = isl_constraint_get_constant_val(c);
-    z = z - isl_val_is_zero(val);
-    isl_val_free(val);
+  int n = isl_constraint_dim(c, isl_dim_set);
+  
+  for(int i= *pos; (i+1)*2 < n; i++){
+    if(isl_constraint_involves_dims(c, isl_dim_out, (i+1)*2, 1)){
+      isl_val * val = isl_constraint_get_constant_val(c);
+      if(isl_val_is_zero(val) == 0){
+	z = -1;
+      }
+      isl_val_free(val);
+    }    
   }
   isl_constraint_free(c);
   return z;
@@ -1097,12 +1114,12 @@ int sch_dim_zero(__isl_keep isl_map * sch, int pos){
 
   int s1 = isl_map_foreach_basic_map(sch, check_bmap_sch_dim, &pos);
 
-  // -1 for found zero
+  // -1 for not found zeros
   if(s1 == -1){
-    return 1;
+    return 0;
   }
   else{
-    return 0;
+    return 1;
   }
 }
 
@@ -1171,9 +1188,16 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   std::cout << "==== Conflict Region: " << std::endl; 
   isl_set_dump(rlt->cft);
 
+  //remove existentially quantified variables
+  isl_set * cft_no_divs = isl_set_remove_divs(isl_set_copy(rlt->cft));
+  // isl_set_dump(rlt->cft);
+  // isl_set_dump(cft_no_divs);
+  // assert(false);
+  
   // dimension number of conflict set
   int n_cd = isl_set_dim(rlt->cft, isl_dim_set);
-
+  int n_cp = isl_set_dim(rlt->cft, isl_dim_param);
+  
   // Take lex points
   isl_set * cft_lexmin = isl_set_lexmin(isl_set_copy(rlt->cft));
   isl_set * cft_lexmax = isl_set_lexmax(isl_set_copy(rlt->cft));
@@ -1181,7 +1205,6 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   isl_set_dump(cft_lexmin); 
   std::cout << "==== lexmax point: " << std::endl;     
   isl_set_dump(cft_lexmax);
-
   
   //assert(false);
   
@@ -1213,53 +1236,70 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // Detect which dimension to be splitted, by lex point comparison
     // more complex cases need for this part!
     std::cout << "==== Search dimension to be splitted " << std::endl;
+    int n_dp = isl_set_dim(stmt_dom, isl_dim_param);
     int n_dd = isl_set_dim(stmt_dom, isl_dim_set);
-    int n_d = (n_cd < n_dd) ? n_cd : n_dd;
-    isl_pw_aff * cd_min;
-    isl_pw_aff * cd_max;
-    isl_pw_aff * dd_min;
-    isl_pw_aff * dd_max;
+    // int n_d = (n_cd < n_dd) ? n_cd : n_dd;
+    
+    /*
+    isl_set * cd_min;
+    isl_set * cd_max;
+    isl_set * dd_min;
+    isl_set * dd_max;
     int eq_min, eq_max;
-    int i_dim = -1;
+    int i_dim = -1;        
     for(int i = n_d-1; i >= 0; i--){
-      cd_min = isl_set_dim_min(isl_set_copy(cft_lexmin), i); 
-      dd_min = isl_set_dim_min(isl_set_copy(stmt_dom), i);
-      cd_max = isl_set_dim_max(isl_set_copy(cft_lexmax), i); 
-      dd_max = isl_set_dim_max(isl_set_copy(stmt_dom), i);
-      eq_min = isl_pw_aff_is_equal(cd_min, dd_min); 
-      eq_max = isl_pw_aff_is_equal(cd_max, dd_max);
-      isl_pw_aff_free(cd_min);
-      isl_pw_aff_free(cd_max);
-      isl_pw_aff_free(dd_min);
-      isl_pw_aff_free(dd_max);
+      //for(int i = 0; i < n_d; i++){
+      cd_min = isl_set_from_pw_aff(isl_set_dim_min(isl_set_copy(cft_lexmin), i)); 
+      dd_min = isl_set_from_pw_aff(isl_set_dim_min(isl_set_copy(stmt_dom), i));
+      cd_max = isl_set_from_pw_aff(isl_set_dim_max(isl_set_copy(cft_lexmax), i)); 
+      dd_max = isl_set_from_pw_aff(isl_set_dim_max(isl_set_copy(stmt_dom), i));
+      
+      cd_min = isl_set_eliminate(cd_min, isl_dim_param, 0, n_cp);
+      cd_max = isl_set_eliminate(cd_max, isl_dim_param, 0, n_cp);
+      dd_min = isl_set_eliminate(dd_min, isl_dim_param, 0, n_dp);
+      dd_max = isl_set_eliminate(dd_max, isl_dim_param, 0, n_dp);
+
+      isl_set_dump(cd_min);
+      isl_set_dump(cd_max);
+      isl_set_dump(dd_min);
+      isl_set_dump(dd_max);
+      
+      eq_min = isl_set_is_equal(cd_min, dd_min); 
+      eq_max = isl_set_is_equal(cd_max, dd_max);            
+
+      isl_set_free(cd_min);
+      isl_set_free(cd_max);
+      isl_set_free(dd_min);
+      isl_set_free(dd_max);
       if(eq_min == 0 || eq_max == 0){
     	i_dim = i;
     	break;
       }
     }
+    */
 
     // detect bound aff
-    // int n_sd = isl_set_dim(stmt_dom, isl_dim_set);
-    // int n_d = (n_cd < n_sd) ? n_cd : n_sd;
-    // int i_dim = -1;
-    // //int n_d = (n_cd < n_sd) ? n_cd : n_sd;
-    // isl_aff * s_dsize;
-    // isl_aff * c_dsize;
-    // int eq_d;
-    // for(int i = n_d-1; i >= 0; i--){
-    //   std::cout << "*** Dim : " << i << " ***"<< std::endl;
-    //   std::cout << "** stmt : "  << std::endl;
-    //   s_dsize = get_dim_size(stmt_dom, i);
-    //   std::cout << "** cft : " << std::endl;
-    //   c_dsize = get_dim_size(rlt->cft, i);
-    //   eq_d = isl_aff_plain_is_equal(s_dsize, c_dsize);
-    //   isl_aff_free(s_dsize);
-    //   isl_aff_free(c_dsize);
-    //   if(eq_d == 0){
-    // 	i_dim = i;
-    // 	break;
-    //   }
-    // }
+    int n_d = (n_cd < n_dd) ? n_cd : n_dd;
+    int i_dim = -1;
+    isl_aff * s_dsize;
+    isl_aff * c_dsize;
+    int eq_d;
+    isl_set * sdom_no_divs = isl_set_remove_divs(isl_set_copy(stmt_dom));
+    for(int i = n_d-1; i >= 0; i--){
+      std::cout << "*** Dim : " << i << " ***"<< std::endl;
+      std::cout << "** stmt : "  << std::endl;
+      s_dsize = get_dim_size(sdom_no_divs, i);
+      std::cout << "** cft : " << std::endl;
+      c_dsize = get_dim_size(cft_no_divs, i);
+      eq_d = isl_aff_plain_is_equal(s_dsize, c_dsize);
+      isl_aff_free(s_dsize);
+      isl_aff_free(c_dsize);
+      if(eq_d == 0){
+    	i_dim = i;
+    	break;
+      }
+    }
+    isl_set_free(sdom_no_divs);
     
     std::cout << "==== Dimension to be splitted: " << i_dim << std::endl;
 
@@ -1269,6 +1309,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       isl_map_free(stmt_sch);
       continue;
     }
+
+    //assert(false);
 
 
     // Match iterators
@@ -1490,6 +1532,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     //dom_3 = remove_param_cft(dom_3, rlt->param);
     //dom_2 = remove_param_cft(dom_2, rlt->param);
     //dom_1 = remove_param_cft(dom_1, rlt->param);
+
+    // simplify set representation
     dom_1 = isl_set_remove_redundancies(dom_1);
     dom_1 = isl_set_coalesce(dom_1);
     dom_2 = isl_set_remove_redundancies(dom_2);
@@ -1498,11 +1542,17 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     dom_3 = isl_set_coalesce(dom_3);
     std::cout << "\n*** Dom 1: " << std::endl;
     isl_set_dump(dom_1);
+    // isl_val * cnt1 = isl_set_count_val(dom_1);
+    // isl_val_dump(cnt1);
     std::cout << "*** Dom 2: " << std::endl;
     isl_set_dump(dom_2);
+    // isl_val * cnt2 = isl_set_count_val(dom_2);
+    // isl_val_dump(cnt2);
     std::cout << "*** Dom 3: " << std::endl;
     isl_set_dump(dom_3);
-    
+    // isl_val * cnt3 = isl_set_count_val(dom_3);
+    // isl_val_dump(cnt3);  
+        
     //assert(false);
   
     // Modify SCoP
@@ -1516,7 +1566,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // whether the first stmt at the splitting dim of stmt schedule map
     int sch_dim_first = sch_dim_zero(stmt_sch, i_dim);
-    std::cout << "===== Current stmt sch at the splitting dim is zero: " << sch_dim_first << std::endl;
+    std::cout << "===== Current stmt sch after the splitting dim are all zeros: " << sch_dim_first << std::endl;
+    isl_map_dump(stmt_sch);
 
     //assert(false);
     

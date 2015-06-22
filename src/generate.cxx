@@ -1002,10 +1002,17 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 #endif
     
 #ifdef LSP
-    // add pragmas for loop splitting
-    std::cout << "Apply pragma for loop splitting" << std::endl;
-    sw = 0;
-    scop->t = 2;
+    if(rlt.param == NULL){ 
+      std::cout << "Keep original codes " << std::endl;
+      sw = 0;
+      scop->t = 0;
+    }
+    else{
+      // add pragmas for loop splitting
+      std::cout << "Apply pragma for loop splitting" << std::endl;
+      sw = 0;
+      scop->t = 2;
+    }
 #endif
     
   }
