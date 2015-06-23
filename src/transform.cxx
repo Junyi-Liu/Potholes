@@ -260,7 +260,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   // flatten (src-snk)
   std::cout << "** Flattening for (src-snk)" << std::endl;
-  // isl_space * sp = isl_set_get_space(isl_set_copy(stmt->domain));
+  isl_set * dom_no_divs = isl_set_remove_divs(isl_set_copy(stmt->domain));
   isl_space * sp = isl_multi_aff_get_domain_space(maff);
   isl_local_space * lsp = isl_local_space_from_space(sp);
   isl_ctx * ctx = isl_local_space_get_ctx(lsp);
@@ -278,10 +278,11 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     // scale up factor
     // consider paramterized dim bounds
     if(i>0){
-      ftr = isl_aff_mul(ftr, get_dim_size(stmt->domain, i));
+      ftr = isl_aff_mul(ftr, get_dim_size(dom_no_divs, i));
       isl_aff_dump(ftr);
     }
   }
+  isl_set_free(dom_no_divs);
   
   if(diff){  
     std::cout << "* flattened (src-snk): "<< std::endl;
