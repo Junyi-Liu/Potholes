@@ -923,6 +923,67 @@ int constraint_scan(__isl_take isl_basic_set * bset, void * user){
   return 0;
 }
 
+// Compare lower & upper bounds in isl_aff 
+int compare_dim_bound(__isl_take isl_constraint * lw, __isl_take isl_constraint * up, __isl_take isl_basic_set * bset, void * user){
+  bd_info * bd = (bd_info *) user;
+  //isl_constraint_dump(c);
+  
+  std::cout <<"-- lower bd: " << std::endl; 
+  isl_aff * min = isl_constraint_get_bound(lw, isl_dim_set, bd->dim);
+  isl_aff_dump(min);
+  std::cout <<"-- upper bd: " << std::endl; 
+  isl_aff * max = isl_constraint_get_bound(up, isl_dim_set, bd->dim);
+  isl_aff_dump(max);
+
+  int eq_max = isl_aff_plain_is_equal(bd->max, max);
+  int eq_min = isl_aff_plain_is_equal(bd->min, min);  
+
+  isl_aff_free(max);
+  isl_aff_free(min);
+  isl_constraint_free(lw);
+  isl_constraint_free(up);
+  isl_basic_set_free(bset);
+  
+  if(eq_max !=0 || eq_min != 0){
+    return -1;
+  }
+  else{
+    return 0;
+  }
+}
+// Scan bset for lower & upper bounds
+int scan_bset_cmp_bd(__isl_take isl_basic_set *bset, void *user){
+
+  bd_info * bd = (bd_info *) user;
+
+  //not handle bset number>1
+  int s1 = isl_basic_set_foreach_bound_pair(bset, isl_dim_set, bd->dim, compare_dim_bound, bd);
+  
+  isl_basic_set_free(bset);
+  return s1;
+}
+// Compare dimension size of two input sets
+int compare_dim_size(__isl_keep isl_set * dom, __isl_keep isl_set * cft, unsigned dim){
+
+  std::cout <<"** stmt dom: " << std::endl; 
+  isl_set_dump(dom);
+  std::cout <<"** cft set: " << std::endl; 
+  isl_set_dump(cft);
+  
+  bd_info bd;
+  bd.dim = dim;
+  // scan dom set
+  int s1 = isl_set_foreach_basic_set(dom, scan_bset_for_bd, &bd);
+  // scan cft set to compare with dom
+  s1 = isl_set_foreach_basic_set(cft, scan_bset_cmp_bd, &bd);
+
+  isl_aff_free(bd.max);
+  isl_aff_free(bd.min);
+  //assert(false);
+
+  //s1=0: equal, s1=-1: inequal
+  return s1+1; 
+}
 
 
 // compare bound pair
@@ -1282,19 +1343,20 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // detect bound aff
     int n_d = (n_cd < n_dd) ? n_cd : n_dd;
     int i_dim = -1;
-    isl_aff * s_dsize;
-    isl_aff * c_dsize;
+    // isl_aff * s_dsize;
+    // isl_aff * c_dsize;
     int eq_d;
     isl_set * sdom_no_divs = isl_set_remove_divs(isl_set_copy(stmt_dom));
     for(int i = n_d-1; i >= 0; i--){
       std::cout << "*** Dim : " << i << " ***"<< std::endl;
-      std::cout << "** stmt : "  << std::endl;
-      s_dsize = get_dim_size(sdom_no_divs, i);
-      std::cout << "** cft : " << std::endl;
-      c_dsize = get_dim_size(cft_no_divs, i);
-      eq_d = isl_aff_plain_is_equal(s_dsize, c_dsize);
-      isl_aff_free(s_dsize);
-      isl_aff_free(c_dsize);
+      // std::cout << "** stmt : "  << std::endl;
+      // s_dsize = get_dim_size(sdom_no_divs, i);
+      // std::cout << "** cft : " << std::endl;
+      // c_dsize = get_dim_size(cft_no_divs, i);
+      // eq_d = isl_aff_plain_is_equal(s_dsize, c_dsize);
+      // isl_aff_free(s_dsize);
+      // isl_aff_free(c_dsize);
+      eq_d = compare_dim_size(sdom_no_divs, cft_no_divs, i);
       if(eq_d == 0){
     	i_dim = i;
     	break;
@@ -1721,6 +1783,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   }
   isl_set_free(cft_lexmin);
   isl_set_free(cft_lexmax);
+  isl_set_free(cft_no_divs);
   return 0;
 }
 
