@@ -283,7 +283,9 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     }
   }
   isl_set_free(dom_no_divs);
-  
+
+
+  // check diff availability
   if(diff){  
     std::cout << "* flattened (src-snk): "<< std::endl;
     isl_aff_dump(diff);
@@ -581,7 +583,8 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   std::istringstream (line) >> stmt.L_delay;
   std::cout<< "*** Delay info: " << stmt.L_delay << std::endl;
   rlt->delay = stmt.L_delay;
-  stmt.L_delay = ceil(float(stmt.L_delay)/float(stmt.II));
+  // assume that delay will not increase over 1.5 times
+  stmt.L_delay = ceil(float(stmt.L_delay)*1.5/float(stmt.II));
   std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
 
   // Make domain always non-empty
@@ -935,8 +938,8 @@ int compare_dim_bound(__isl_take isl_constraint * lw, __isl_take isl_constraint 
   isl_aff * max = isl_constraint_get_bound(up, isl_dim_set, bd->dim);
   isl_aff_dump(max);
 
-  int eq_max = isl_aff_plain_is_equal(bd->max, max);
-  int eq_min = isl_aff_plain_is_equal(bd->min, min);  
+  bool eq_max = isl_aff_plain_is_equal(bd->max, max);
+  bool eq_min = isl_aff_plain_is_equal(bd->min, min);  
 
   isl_aff_free(max);
   isl_aff_free(min);
@@ -944,11 +947,11 @@ int compare_dim_bound(__isl_take isl_constraint * lw, __isl_take isl_constraint 
   isl_constraint_free(up);
   isl_basic_set_free(bset);
   
-  if(eq_max !=0 || eq_min != 0){
-    return -1;
+  if(eq_max && eq_min){
+    return 0;
   }
   else{
-    return 0;
+    return -1;
   }
 }
 // Scan bset for lower & upper bounds
@@ -998,7 +1001,8 @@ int cmp_bound_pair(__isl_take isl_constraint * lw, __isl_take isl_constraint * u
   bd->max = isl_constraint_get_bound(up, isl_dim_set, bd->dim);
   //isl_aff_dump(bd->max);
 
-  int ds = isl_aff_plain_is_equal(bd->max, bd->min);
+  // stop scan when bounds are not equal
+  bool ds = isl_aff_plain_is_equal(bd->max, bd->min);
   if(ds) bd->has_single = 1;
   else bd->has_not_single = 1;
   // std::cout <<"-- bd equal: " << ds << std::endl; 
