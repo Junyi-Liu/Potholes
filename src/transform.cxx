@@ -583,8 +583,8 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   std::istringstream (line) >> stmt.L_delay;
   std::cout<< "*** Delay info: " << stmt.L_delay << std::endl;
   rlt->delay = stmt.L_delay;
-  // assume that delay will not increase over 1.5 times
-  stmt.L_delay = ceil(float(stmt.L_delay)*1.5/float(stmt.II));
+  // assume that delay will not increase over 1.2 times
+  stmt.L_delay = ceil(float(stmt.L_delay)*1.2/float(stmt.II));
   std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
 
   // Make domain always non-empty
