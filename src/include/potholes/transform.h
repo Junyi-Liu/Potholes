@@ -237,8 +237,8 @@ __isl_give pet_tree *pet_tree_dup(__isl_keep pet_tree *tree);
 int splitLoop(pet_scop * scop, recur_info * rlt);
 
 // Configure optimization mode
-#define LSP //PLP
-
+#define LSP 
+//#define PLP
 
 #endif	/* TRANSFORM_H */
 
