@@ -1461,8 +1461,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       dom_3 = isl_set_empty(isl_set_get_space(stmt_dom));
     }    
 
-    // apply conflict region
-    dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
+
     isl_set_dump(dom_3);
   
     //assert(false);
@@ -1482,7 +1481,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
     else if(ds_3 == 1){
       // combine part 2 and 3
-      std::cout << "* combine part 2 and part 3 " << std::endl;
+      std::cout << "* combine part 2 and part 3 " << std::endl; 
       // dom_2 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
       // dom_2 = isl_set_subtract(dom_2, isl_set_copy(dom_lexmin));
       dom_2 = isl_set_subtract(isl_set_copy(stmt_dom), isl_set_copy(dom_lexmin));
@@ -1493,8 +1492,10 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       dom_2 = isl_set_subtract(isl_set_copy(dom_lexmax), isl_set_copy(dom_lexmin));
     }
 
-    // apply conflict region
-    dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
+    // check dom_2 emptiness
+    int emp_2 = isl_set_is_empty(dom_2);
+    std::cout << "** dom_2 is empty:  " << emp_2 << std::endl; 
+    
     dom_2 = isl_set_remove_redundancies(dom_2);
     dom_2 = isl_set_coalesce(dom_2);
     isl_set_dump(dom_2);
@@ -1509,8 +1510,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       dom_1 = isl_set_empty(isl_set_get_space(dom_2));
     }
 
-    // apply conflict region
-    dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
+
     dom_1 = isl_set_remove_redundancies(dom_1);
     dom_1 = isl_set_coalesce(dom_1);
     isl_set_dump(dom_1);
@@ -1559,7 +1559,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     //Special Case: dom_1 or dom_3 are not fully single
     dom_sep sep;
-    if(ds_lexmin != 1){
+    if(ds_lexmin != 1 && emp_2 != 1){
       std::cout << "*** Seperate single basic sets of dom_1 " << std::endl;
       sep.i_dim = i_dim;
       sep.s = 0;
@@ -1578,7 +1578,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 	isl_set_free(sep.dom_s);
       }
     }
-    if(ds_3 != 1){
+    if(ds_3 != 1 && emp_2 != 1){
       std::cout << "*** Seperate single basic sets of dom_3" << std::endl;
       sep.i_dim = i_dim;      
       sep.s = 0;
@@ -1603,6 +1603,14 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     //dom_2 = remove_param_cft(dom_2, rlt->param);
     //dom_1 = remove_param_cft(dom_1, rlt->param);
 
+
+    // apply conflict region
+    //if(emp_2 != 1){
+      dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
+      dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
+      dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
+      //}
+    
     // simplify set representation
     dom_1 = isl_set_remove_redundancies(dom_1);
     dom_1 = isl_set_coalesce(dom_1);
@@ -1775,53 +1783,54 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     /**********************
      **  Part 4 : All Fast
-     **********************/       
-    std::cout << "\n======= Part 4: ALL FAST " << std::endl;
-    scop->stmts[ui_st+2] = isl_alloc_type(ctx, struct pet_stmt);
-    scop->stmts[ui_st+2]->loc = scop->stmts[i_st]->loc;
+     **********************/
+    //if(emp_2 != 1){
+      std::cout << "\n======= Part 4: ALL FAST " << std::endl;
+      scop->stmts[ui_st+2] = isl_alloc_type(ctx, struct pet_stmt);
+      scop->stmts[ui_st+2]->loc = scop->stmts[i_st]->loc;
 
-    std::cout << "*** Copy args: " << std::endl;
-    scop->stmts[ui_st+2]->n_arg = scop->stmts[i_st]->n_arg;
-    std::cout << "number of args: " << scop->stmts[i_st]->n_arg << std::endl;
+      std::cout << "*** Copy args: " << std::endl;
+      scop->stmts[ui_st+2]->n_arg = scop->stmts[i_st]->n_arg;
+      std::cout << "number of args: " << scop->stmts[i_st]->n_arg << std::endl;
     
-    scop->stmts[ui_st+2]->args = isl_alloc(ctx, pet_expr *, sizeof(pet_expr *) * scop->stmts[ui_st+2]->n_arg);
-    if((scop->stmts[i_st]->n_arg) > 0){
-      for(int i=0; i< (scop->stmts[i_st]->n_arg) -1; i++){
-	std::cout << "Args:  " << i << std::endl;
-	scop->stmts[ui_st+2]->args[i] = pet_expr_copy(scop->stmts[i_st]->args[i]);
-      }    
-    }  
+      scop->stmts[ui_st+2]->args = isl_alloc(ctx, pet_expr *, sizeof(pet_expr *) * scop->stmts[ui_st+2]->n_arg);
+      if((scop->stmts[i_st]->n_arg) > 0){
+	for(int i=0; i< (scop->stmts[i_st]->n_arg) -1; i++){
+	  std::cout << "Args:  " << i << std::endl;
+	  scop->stmts[ui_st+2]->args[i] = pet_expr_copy(scop->stmts[i_st]->args[i]);
+	}    
+      }  
 
-    std::cout << "*** Domain: " << std::endl;
-    // set specific id name for the first splitted stmt
-    std::string p4_str;
-    if(sch_dim_first == 1){
-      p4_str.assign("p4_");
-    }
-    else{
-      p4_str.assign("flw_p4_");
-    }
-    p4_str.append(isl_id_get_name(stmt_id));
-    p_id = isl_id_alloc(ctx, p4_str.c_str(), NULL);
-    isl_set * dom_4 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_copy(rlt->param));			    
-    dom_4 = isl_set_set_tuple_id(dom_4, isl_id_copy(p_id));
-    scop->stmts[ui_st+2]->domain = isl_set_copy(dom_4);  
-    isl_set_dump(scop->stmts[ui_st+2]->domain);
+      std::cout << "*** Domain: " << std::endl;
+      // set specific id name for the first splitted stmt
+      std::string p4_str;
+      if(sch_dim_first == 1){
+	p4_str.assign("p4_");
+      }
+      else{
+	p4_str.assign("flw_p4_");
+      }
+      p4_str.append(isl_id_get_name(stmt_id));
+      p_id = isl_id_alloc(ctx, p4_str.c_str(), NULL);
+      isl_set * dom_4 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_copy(rlt->param));			    
+      dom_4 = isl_set_set_tuple_id(dom_4, isl_id_copy(p_id));
+      scop->stmts[ui_st+2]->domain = isl_set_copy(dom_4);  
+      isl_set_dump(scop->stmts[ui_st+2]->domain);
 
-    std::cout << "*** Schedule: " << std::endl;
-    scop->stmts[ui_st+2]->schedule = sch_modify(stmt_sch, dom_4, p_id, i_dim, 4);
-    isl_map_dump(scop->stmts[ui_st+2]->schedule);
+      std::cout << "*** Schedule: " << std::endl;
+      scop->stmts[ui_st+2]->schedule = sch_modify(stmt_sch, dom_4, p_id, i_dim, 4);
+      isl_map_dump(scop->stmts[ui_st+2]->schedule);
 
-    std::cout << "*** Stmt body: " << std::endl;
-    scop->stmts[ui_st+2]->body = pet_tree_copy(scop->stmts[i_st]->body);
-    //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
-    isl_id_free(p_id);
-    
+      std::cout << "*** Stmt body: " << std::endl;
+      scop->stmts[ui_st+2]->body = pet_tree_copy(scop->stmts[i_st]->body);
+      //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
+      isl_id_free(p_id);
+      isl_set_free(dom_4);
+      //}
     
   
     //assert(false);
     isl_id_free(stmt_id);
-    isl_set_free(dom_4);
     isl_set_free(dom_3);
     isl_set_free(dom_2);
     isl_set_free(dom_1);

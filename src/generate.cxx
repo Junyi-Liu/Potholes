@@ -1088,6 +1088,22 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   isl_ast_print_options * options = isl_ast_print_options_alloc(pth_get_ctx_from_scop(pscop));
   isl_ast_build * build = isl_ast_build_from_context(pscop->context);
 
+  // configure isl_ast_build
+  std::cout << "===== Configure isl_ast_build" << std::endl;
+  isl_ctx * b_ctx = isl_ast_build_get_ctx(build);
+  int b1 = isl_options_get_ast_build_atomic_upper_bound(b_ctx);
+  std::cout << "atomic upper bound: " << b1 << std::endl;
+  b1 = isl_options_get_ast_build_exploit_nested_bounds(b_ctx);
+  std::cout << "exploit nested bounds: " << b1 << std::endl;
+  b1 = isl_options_get_ast_build_allow_or(b_ctx);
+  std::cout << "allow or : " << b1 << std::endl;
+  b1 = isl_options_get_ast_build_allow_else(b_ctx);
+  std::cout << "allow else : " << b1 << std::endl;
+  isl_options_set_ast_build_group_coscheduled(b_ctx,1);
+  b1 = isl_options_get_ast_build_group_coscheduled(b_ctx);
+  std::cout << "group coscheduled : " << b1 << std::endl;
+
+  
   //  isl_union_set_dump(domain);
   //assert(false);
 
