@@ -260,6 +260,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
   // flatten (src-snk)
   std::cout << "** Flattening for (src-snk)" << std::endl;
+  int outer_dep = 0;
   isl_set * dom_no_divs = isl_set_remove_divs(isl_set_copy(stmt->domain));
   isl_space * sp = isl_multi_aff_get_domain_space(maff);
   isl_local_space * lsp = isl_local_space_from_space(sp);
@@ -269,12 +270,23 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   isl_aff * diff = isl_aff_zero_on_domain(isl_local_space_copy(lsp));
   for(int i=stmt->n_it-1; i>=0; i--){
     std::cout << "* dimension: "<< i << std::endl;
+
     // add dimension item with factor
     if(i < d_maff){
       isl_aff * dim = isl_multi_aff_get_aff(maff, i);
+
+      // check whether dependency is at the outer dimension
+      if(i < stmt->n_it-1){
+	if(isl_aff_plain_is_zero(dim) == 0){
+	  outer_dep = 1;
+	  std::cout << "find outer dependency" << std::endl;
+	}
+      }
+      
       dim = isl_aff_mul(dim, isl_aff_copy(ftr));
       diff = isl_aff_add(diff, dim);
     }
+    
     // scale up factor
     // consider paramterized dim bounds
     if(i>0){
@@ -377,6 +389,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     // set_intersect for difference pieces(conditions), since current piece's safe range contains other piece's conflict range
     stmt->param = isl_set_intersect(stmt->param,isl_set_copy(empty));
     stmt->cft = isl_set_union(stmt->cft, isl_set_copy(bd));
+    if(outer_dep == 0) stmt->outer_dep = 0;
   }
   
   //stmt->param = isl_set_params(*empty);
@@ -632,7 +645,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
     std::cout << "==== Schedule: " << std::endl;
     isl_map_dump(scop->stmts[acc_wr[j].idx_stmt]->schedule);
 
-    //record number of pt and it
+    // record number of pt and it
     stmt.n_pt = isl_set_n_param(stmt.domain);
     stmt.n_it = isl_set_n_dim(stmt.domain);
     
@@ -730,6 +743,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   // copy final results
   rlt->param = isl_set_copy(stmt.param);
   rlt->cft = isl_set_copy(stmt.cft);
+  rlt->outer_dep = stmt.outer_dep;
   
   // Free isl objects
   for(int i=0; i<stmt.n_acc_wr; i++){
@@ -1143,8 +1157,10 @@ __isl_give isl_map * sch_modify(__isl_keep isl_map * stmt_sch, __isl_keep isl_se
   //int s1 = isl_map_foreach_basic_map(stmt_sch, sch_inc, &sch);
   sch.sch_map = isl_map_copy(stmt_sch); // use same schedule!!!!!!
     
-  sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));  
-  return isl_map_intersect_domain(sch.sch_map, isl_set_copy(dom));
+  // sch.sch_map = isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));  
+  // return isl_map_intersect_domain(sch.sch_map, isl_set_copy(dom));
+
+  return isl_map_set_tuple_id(sch.sch_map, isl_dim_in, isl_id_copy(stmt_id));
 }
 
 
@@ -1273,6 +1289,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   isl_set_dump(cft_lexmax);
   
   //assert(false);
+
+  std::cout << "==== Outer dimensions have dependence: " << rlt->outer_dep << std::endl; 
   
   // statement information
   std::cout << "==== Number of statements in SCoP: "<< scop->n_stmt << std::endl;
@@ -1298,6 +1316,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // Copy statement schedule
     isl_map * stmt_sch = isl_map_copy(scop->stmts[i_st]->schedule);
+    std::cout << "==== Statement schedule: " << std::endl;
+    isl_map_dump(stmt_sch);
     
     // Detect which dimension to be splitted, by lex point comparison
     // more complex cases need for this part!
@@ -1377,6 +1397,109 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       continue;
     }
 
+    // dependency locates in the inner-most dimension and across the outer dimension
+    if(i_dim == n_dd-1 && rlt->outer_dep == 1){
+      std::cout << "\n======= Cut innermost dimension by unflatten loop " << std::endl;
+
+      std::cout << "\n================= Modify SCoP =================" << std::endl;
+      int ui_st = scop->n_stmt;
+      scop->n_stmt = scop->n_stmt + 1;
+
+      // alloc new space
+      isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[i_st]->body);
+      scop->stmts = isl_realloc(ctx, scop->stmts, struct pet_stmt *, sizeof(struct pet_stmt *) * scop->n_stmt);
+      
+      // whether the first stmt at its inner-most dim of stmt schedule map
+      int sch_dim_first = sch_dim_zero(stmt_sch, i_dim);
+      std::cout << "===== Current stmt is the first of its inner-most schedule dim: " << sch_dim_first << std::endl;
+      isl_map_dump(stmt_sch);
+
+      /**************
+       **  Part 1: unflatten
+       **************/
+      std::cout << "\n======= Part 1 " << std::endl;
+      std::cout << "*** Domain: " << std::endl;
+      isl_id * stmt_id = isl_set_get_tuple_id(stmt_dom_rcd[i_st]);
+
+      // apply id label for apply pragma
+      isl_id * p_id;
+      if(sch_dim_first == 1){
+	std::string p1_str;
+	// for unflatten loop 
+	p1_str.assign("unflt_");
+	p1_str.append(isl_id_get_name(stmt_id));		   
+	p_id = isl_id_alloc(ctx, p1_str.c_str(), NULL);
+      }
+      else{
+	// no need to add "flw_" as done for P2 & P3
+	p_id = isl_id_copy(stmt_id);
+      }
+
+      // add p1 id
+      stmt_dom = isl_set_set_tuple_id(stmt_dom, isl_id_copy(p_id));
+      isl_set_free(scop->stmts[i_st]->domain);
+      scop->stmts[i_st]->domain = isl_set_copy(stmt_dom);
+      isl_set_dump(scop->stmts[i_st]->domain);
+      //isl_set_free(dom_2);
+  
+      std::cout << "*** Schedule: " << std::endl;
+      scop->stmts[i_st]->schedule = sch_modify(stmt_sch, stmt_dom, p_id, i_dim, 0);
+      isl_map_dump(scop->stmts[i_st]->schedule);
+      isl_id_free(p_id);
+
+      /**********************
+       **  Part 4 : All Fast
+       **********************/
+      std::cout << "\n======= Part 4: ALL FAST " << std::endl;
+      scop->stmts[ui_st] = isl_alloc_type(ctx, struct pet_stmt);
+      scop->stmts[ui_st]->loc = scop->stmts[i_st]->loc;
+
+      std::cout << "*** Copy args: " << std::endl;
+      scop->stmts[ui_st]->n_arg = scop->stmts[i_st]->n_arg;
+      std::cout << "number of args: " << scop->stmts[i_st]->n_arg << std::endl;
+    
+      scop->stmts[ui_st]->args = isl_alloc(ctx, pet_expr *, sizeof(pet_expr *) * scop->stmts[ui_st]->n_arg);
+      if((scop->stmts[i_st]->n_arg) > 0){
+	for(int i=0; i< (scop->stmts[i_st]->n_arg) -1; i++){
+	  std::cout << "Args:  " << i << std::endl;
+	  scop->stmts[ui_st]->args[i] = pet_expr_copy(scop->stmts[i_st]->args[i]);
+	}    
+      }  
+
+      std::cout << "*** Domain: " << std::endl;
+      // set specific id name for the first splitted stmt
+      std::string p4_str;
+      if(sch_dim_first == 1){
+	p4_str.assign("p4_");
+      }
+      else{
+	p4_str.assign("flw_p4_");
+      }
+      p4_str.append(isl_id_get_name(stmt_id));
+      p_id = isl_id_alloc(ctx, p4_str.c_str(), NULL);
+      isl_set * dom_4 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_copy(rlt->param));			    
+      //isl_set * dom_4 = isl_set_copy(stmt_dom);
+      dom_4 = isl_set_set_tuple_id(dom_4, isl_id_copy(p_id));
+      scop->stmts[ui_st]->domain = isl_set_copy(dom_4);  
+      isl_set_dump(scop->stmts[ui_st]->domain);
+
+      std::cout << "*** Schedule: " << std::endl;
+      scop->stmts[ui_st]->schedule = sch_modify(stmt_sch, dom_4, p_id, i_dim, 4);
+      isl_map_dump(scop->stmts[ui_st]->schedule);
+
+      std::cout << "*** Stmt body: " << std::endl;
+      scop->stmts[ui_st]->body = pet_tree_copy(scop->stmts[i_st]->body);
+      //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
+      isl_id_free(p_id);
+      isl_set_free(dom_4);
+      
+
+      isl_id_free(stmt_id);
+      isl_set_free(stmt_dom);
+      isl_map_free(stmt_sch);
+      continue;
+    }
+    
     //assert(false);
 
 
@@ -1606,9 +1729,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // apply conflict region
     //if(emp_2 != 1){
-      dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
-      dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
-      dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
+    dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
+    dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
+    dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
       //}
     
     // simplify set representation
@@ -1784,49 +1907,48 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     /**********************
      **  Part 4 : All Fast
      **********************/
-    //if(emp_2 != 1){
-      std::cout << "\n======= Part 4: ALL FAST " << std::endl;
-      scop->stmts[ui_st+2] = isl_alloc_type(ctx, struct pet_stmt);
-      scop->stmts[ui_st+2]->loc = scop->stmts[i_st]->loc;
+    std::cout << "\n======= Part 4: ALL FAST " << std::endl;
+    scop->stmts[ui_st+2] = isl_alloc_type(ctx, struct pet_stmt);
+    scop->stmts[ui_st+2]->loc = scop->stmts[i_st]->loc;
 
-      std::cout << "*** Copy args: " << std::endl;
-      scop->stmts[ui_st+2]->n_arg = scop->stmts[i_st]->n_arg;
-      std::cout << "number of args: " << scop->stmts[i_st]->n_arg << std::endl;
+    std::cout << "*** Copy args: " << std::endl;
+    scop->stmts[ui_st+2]->n_arg = scop->stmts[i_st]->n_arg;
+    std::cout << "number of args: " << scop->stmts[i_st]->n_arg << std::endl;
     
-      scop->stmts[ui_st+2]->args = isl_alloc(ctx, pet_expr *, sizeof(pet_expr *) * scop->stmts[ui_st+2]->n_arg);
-      if((scop->stmts[i_st]->n_arg) > 0){
-	for(int i=0; i< (scop->stmts[i_st]->n_arg) -1; i++){
-	  std::cout << "Args:  " << i << std::endl;
-	  scop->stmts[ui_st+2]->args[i] = pet_expr_copy(scop->stmts[i_st]->args[i]);
-	}    
-      }  
+    scop->stmts[ui_st+2]->args = isl_alloc(ctx, pet_expr *, sizeof(pet_expr *) * scop->stmts[ui_st+2]->n_arg);
+    if((scop->stmts[i_st]->n_arg) > 0){
+      for(int i=0; i< (scop->stmts[i_st]->n_arg) -1; i++){
+	std::cout << "Args:  " << i << std::endl;
+	scop->stmts[ui_st+2]->args[i] = pet_expr_copy(scop->stmts[i_st]->args[i]);
+      }    
+    }  
 
-      std::cout << "*** Domain: " << std::endl;
-      // set specific id name for the first splitted stmt
-      std::string p4_str;
-      if(sch_dim_first == 1){
-	p4_str.assign("p4_");
-      }
-      else{
-	p4_str.assign("flw_p4_");
-      }
-      p4_str.append(isl_id_get_name(stmt_id));
-      p_id = isl_id_alloc(ctx, p4_str.c_str(), NULL);
-      isl_set * dom_4 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_copy(rlt->param));			    
-      dom_4 = isl_set_set_tuple_id(dom_4, isl_id_copy(p_id));
-      scop->stmts[ui_st+2]->domain = isl_set_copy(dom_4);  
-      isl_set_dump(scop->stmts[ui_st+2]->domain);
+    std::cout << "*** Domain: " << std::endl;
+    // set specific id name for the first splitted stmt
+    std::string p4_str;
+    if(sch_dim_first == 1){
+      p4_str.assign("p4_");
+    }
+    else{
+      p4_str.assign("flw_p4_");
+    }
+    p4_str.append(isl_id_get_name(stmt_id));
+    p_id = isl_id_alloc(ctx, p4_str.c_str(), NULL);
+    isl_set * dom_4 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_copy(rlt->param));			    
+    //isl_set * dom_4 = isl_set_copy(stmt_dom);
+    dom_4 = isl_set_set_tuple_id(dom_4, isl_id_copy(p_id));
+    scop->stmts[ui_st+2]->domain = isl_set_copy(dom_4);  
+    isl_set_dump(scop->stmts[ui_st+2]->domain);
 
-      std::cout << "*** Schedule: " << std::endl;
-      scop->stmts[ui_st+2]->schedule = sch_modify(stmt_sch, dom_4, p_id, i_dim, 4);
-      isl_map_dump(scop->stmts[ui_st+2]->schedule);
+    std::cout << "*** Schedule: " << std::endl;
+    scop->stmts[ui_st+2]->schedule = sch_modify(stmt_sch, dom_4, p_id, i_dim, 4);
+    isl_map_dump(scop->stmts[ui_st+2]->schedule);
 
-      std::cout << "*** Stmt body: " << std::endl;
-      scop->stmts[ui_st+2]->body = pet_tree_copy(scop->stmts[i_st]->body);
-      //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
-      isl_id_free(p_id);
-      isl_set_free(dom_4);
-      //}
+    std::cout << "*** Stmt body: " << std::endl;
+    scop->stmts[ui_st+2]->body = pet_tree_copy(scop->stmts[i_st]->body);
+    //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
+    isl_id_free(p_id);
+    isl_set_free(dom_4);
     
   
     //assert(false);

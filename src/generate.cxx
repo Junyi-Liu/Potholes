@@ -704,10 +704,11 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
 
   // Further simplfy domains !!!!
   std::cout << "=========== New ast build union map ==========" << std::endl;
+  //pbuild->executed = isl_union_map_remove_redundancies(pbuild->executed); 
   pbuild->executed = isl_union_map_coalesce(pbuild->executed);
   isl_union_map_dump(pbuild->executed);
 
-  // assert(false);
+  //assert(false);
 
   if (map_count == 1) {
     isl_id * tuple_id;
@@ -715,6 +716,22 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     (void)(success);
 
     const char * id_str = isl_id_get_name(tuple_id);
+    
+    // check whether stmt has been generated
+    // int stmt_i = -1;
+    // for(int i=0; i < scop->n_stmt; i++){      
+    //   const char * stmt_str = isl_id_get_name(scop->stmts[i]->id);
+    //   if (strcmp(id_str, stmt_str) == 0) {
+    // 	std::cout << "==== Found generated stmt" << std::endl;
+    // 	stmt_i = i;
+    // 	pbuild->executed = isl_union_map_union(pbuild->executed, scop->stmts[i]->umap);
+    // 	isl_union_map_dump(pbuild->executed);
+    // 	//std::cout << "==== " << isl_union_map_n_map(pbuild->executed) << std::endl;
+    // 	//assert(false);
+    //   }	
+    // }  
+    
+
     std::cout << "=== ast generation for stmt : " << id_str << std::endl;
     int p1 = strncmp(id_str, "p1", 2);
     int p2 = strncmp(id_str, "p2", 2);
@@ -758,6 +775,9 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     else{
       stmt->unflt = 0;
     }
+
+    // record executed map
+    // stmt->umap = isl_union_map_copy(pbuild->executed);
     
     // append id name with statement number for correct printing based on unique ids 
     isl_ctx * ctx = isl_id_get_ctx(tuple_id);
@@ -767,16 +787,20 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     tuple_id = isl_id_alloc(ctx, ss.str().c_str(), NULL);
     isl_id_free(stmt->id);
     stmt->id = isl_id_copy(tuple_id);   
+
     
     // insert generated stmt in scop user pointer
     pth_scop_insert_stmt(scop, stmt);
-    
+
     // return node of zero (dummy node)
     isl_val * val = isl_val_zero(pth_ast_build_get_ctx(pbuild));
-    isl_ast_node * node = isl_ast_node_alloc_user(isl_ast_expr_from_val(val)); 
+    isl_ast_node * node = isl_ast_node_alloc_user(isl_ast_expr_from_val(val));
+    
     // set statement tuple_id for getting the user_statement to print later
     node = isl_ast_node_set_annotation(node, tuple_id);
     return node;
+    
+    
   }       
 
   assert(false);
@@ -878,25 +902,29 @@ isl_printer * pth_print_user_statement(isl_printer * printer, isl_ast_print_opti
   // get annotation from node
   pth_id  * statement_id = isl_ast_node_get_annotation(node);
 
-  // look up pth stmt from scop    
-  pth_ast_stmt * stmt = pth_ast_get_scop_statement_by_id(scop, statement_id);
+  if(statement_id){
 
-  isl_id_dump(statement_id);
-  std::cout << "stmt->t: "<< stmt->t << std::endl;
+    // look up pth stmt from scop    
+    pth_ast_stmt * stmt = pth_ast_get_scop_statement_by_id(scop, statement_id);
+
+    isl_id_dump(statement_id);
+    std::cout << "stmt->t: "<< stmt->t << std::endl;
   
-  if (stmt) { 
+    if (stmt) { 
     
-    switch(stmt->type) {
-    case pth_call_stmt : { 
-      printer = pth_print_call_statement(printer, options, scop, stmt);
-    } break;
-    case pth_assign_stmt : {    
-      printer = pth_print_assign_statement(printer, options,scop,  stmt);
-    } break;
-    default : assert(false);
+      switch(stmt->type) {
+      case pth_call_stmt : { 
+	printer = pth_print_call_statement(printer, options, scop, stmt);
+      } break;
+      case pth_assign_stmt : {    
+	printer = pth_print_assign_statement(printer, options,scop,  stmt);
+      } break;
+      default : assert(false);
+      }
     }
-  }
 
+  }
+  
   return printer;
 }
 
@@ -1099,9 +1127,9 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   std::cout << "allow or : " << b1 << std::endl;
   b1 = isl_options_get_ast_build_allow_else(b_ctx);
   std::cout << "allow else : " << b1 << std::endl;
-  isl_options_set_ast_build_group_coscheduled(b_ctx,1);
-  b1 = isl_options_get_ast_build_group_coscheduled(b_ctx);
-  std::cout << "group coscheduled : " << b1 << std::endl;
+  // isl_options_set_ast_build_group_coscheduled(b_ctx,1);
+  // b1 = isl_options_get_ast_build_group_coscheduled(b_ctx);
+  // std::cout << "group coscheduled : " << b1 << std::endl;
 
   
   //  isl_union_set_dump(domain);
@@ -1165,6 +1193,9 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     std::cout << "\n*********** START GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
+
+    isl_ast_node_dump(node);
+    
     definitions_list = isl_ast_node_list_add(definitions_list, node);
     std::cout << "\n*********** END GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
   }

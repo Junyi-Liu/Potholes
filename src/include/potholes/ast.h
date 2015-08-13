@@ -84,7 +84,9 @@ struct pth_ast_stmt {
   int t;
   // check whether print disable loop flatten pragma
   int unflt = 0;
-  
+  // executed union map
+  //isl_union_map * umap;
+    
   union { 
     struct { 
       pth_ast_node * lhs;

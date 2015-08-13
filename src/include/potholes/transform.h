@@ -106,6 +106,9 @@ struct stmt_info{
 
   // current iteration conflict region
   isl_set * cft;
+
+  // outer dimensions have dependence
+  int outer_dep = 1;
   
   // statement memeory access info
   int n_acc_wr = 0; 
@@ -138,6 +141,9 @@ struct recur_info{
   // iteration conflict region
   isl_set * cft = NULL;
 
+  // all outer dimensions have dependence
+  int outer_dep;
+  
   // loop delay
   int delay;
   
