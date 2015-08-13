@@ -1398,7 +1398,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
 
     // dependency locates in the inner-most dimension and across the outer dimension
-    if(i_dim == n_dd-1 && rlt->outer_dep == 1){
+    if(i_dim == n_cd-1 && rlt->outer_dep == 1){
       std::cout << "\n======= Cut innermost dimension by unflatten loop " << std::endl;
 
       std::cout << "\n================= Modify SCoP =================" << std::endl;
