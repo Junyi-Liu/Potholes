@@ -1436,14 +1436,15 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       }
 
       // add p1 id
-      stmt_dom = isl_set_set_tuple_id(stmt_dom, isl_id_copy(p_id));
+      isl_set * dom_1 = isl_set_intersect_params(isl_set_copy(stmt_dom), isl_set_complement(isl_set_copy(rlt->param)));
+      dom_1 = isl_set_set_tuple_id(dom_1, isl_id_copy(p_id));
       isl_set_free(scop->stmts[i_st]->domain);
-      scop->stmts[i_st]->domain = isl_set_copy(stmt_dom);
+      scop->stmts[i_st]->domain = isl_set_copy(dom_1);
       isl_set_dump(scop->stmts[i_st]->domain);
       //isl_set_free(dom_2);
   
       std::cout << "*** Schedule: " << std::endl;
-      scop->stmts[i_st]->schedule = sch_modify(stmt_sch, stmt_dom, p_id, i_dim, 0);
+      scop->stmts[i_st]->schedule = sch_modify(stmt_sch, dom_1, p_id, i_dim, 0);
       isl_map_dump(scop->stmts[i_st]->schedule);
       isl_id_free(p_id);
 
