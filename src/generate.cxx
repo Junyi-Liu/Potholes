@@ -1158,7 +1158,9 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   if(sw){
     std::cout << "\n*********** Constructing If(safe): ALL FAST, Else: SLOW or SPLIT ****************" << std::endl; 
     // generate if guard
-    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, isl_set_copy(rlt.param));
+    isl_set * guard = isl_set_remove_redundancies(isl_set_complement(isl_set_copy(rlt.param)));
+    guard = isl_set_coalesce(guard);
+    isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, guard);
     isl_ast_expr_dump(p_expr);
 
     // alloc if ast
@@ -1171,8 +1173,10 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     //assert(false);
     
-    // AST of fast mode
-    p_ast->u.i.then = isl_ast_node_copy(node);
+    // AST of else mode: slow or split
+    p_ast->u.i.else_node = isl_ast_node_copy(node);
+    
+    std::cout << "\n*********** AST Node Generation of SLOW or SPLIT mode ****************" << std::endl; 
 
     #ifdef LSP
     std::cout << "\n************* START: SCoP Modification for Loop Splitting *************" << std::endl;  
@@ -1196,9 +1200,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     }
     #endif
 
-    // AST of else mode: slow or split
-    std::cout << "\n*********** AST Node Generation of SLOW or SPLIT mode ****************" << std::endl; 
-    p_ast->u.i.else_node = isl_ast_node_copy(node); 
+    // AST of fast mode
+    p_ast->u.i.then = isl_ast_node_copy(node);
     
     definitions_list = isl_ast_node_list_add(definitions_list, p_ast);  
     isl_ast_node_free(node);
