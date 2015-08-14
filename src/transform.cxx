@@ -1402,12 +1402,12 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       std::cout << "\n======= Cut innermost dimension by unflatten loop " << std::endl;
 
       std::cout << "\n================= Modify SCoP =================" << std::endl;
-      int ui_st = scop->n_stmt;
-      scop->n_stmt = scop->n_stmt + 1;
+      //int ui_st = scop->n_stmt;
+      //scop->n_stmt = scop->n_stmt + 1;
 
       // alloc new space
       isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[i_st]->body);
-      scop->stmts = isl_realloc(ctx, scop->stmts, struct pet_stmt *, sizeof(struct pet_stmt *) * scop->n_stmt);
+      //scop->stmts = isl_realloc(ctx, scop->stmts, struct pet_stmt *, sizeof(struct pet_stmt *) * scop->n_stmt);
       
       // whether the first stmt at its inner-most dim of stmt schedule map
       int sch_dim_first = sch_dim_zero(stmt_sch, i_dim);
@@ -1447,10 +1447,13 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       scop->stmts[i_st]->schedule = sch_modify(stmt_sch, dom_1, p_id, i_dim, 0);
       isl_map_dump(scop->stmts[i_st]->schedule);
       isl_id_free(p_id);
+      isl_set_free(dom_1);
 
+      
       /**********************
        **  Part 4 : All Fast
        **********************/
+      /*
       std::cout << "\n======= Part 4: ALL FAST " << std::endl;
       scop->stmts[ui_st] = isl_alloc_type(ctx, struct pet_stmt);
       scop->stmts[ui_st]->loc = scop->stmts[i_st]->loc;
@@ -1493,7 +1496,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
       isl_id_free(p_id);
       isl_set_free(dom_4);
-      
+      */
 
       isl_id_free(stmt_id);
       isl_set_free(stmt_dom);
@@ -1722,18 +1725,18 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       }
     }
     
-    // remove conflict region related parameter constraints
-    //dom_3 = remove_param_cft(dom_3, rlt->param);
-    //dom_2 = remove_param_cft(dom_2, rlt->param);
-    //dom_1 = remove_param_cft(dom_1, rlt->param);
-
-
+    
     // apply conflict region
     //if(emp_2 != 1){
     dom_3 = isl_set_intersect_params(dom_3, isl_set_complement(isl_set_copy(rlt->param)));
     dom_2 = isl_set_intersect_params(dom_2, isl_set_complement(isl_set_copy(rlt->param)));
     dom_1 = isl_set_intersect_params(dom_1, isl_set_complement(isl_set_copy(rlt->param)));
       //}
+
+    // remove conflict region related parameter constraints
+    // dom_3 = remove_param_cft(dom_3, rlt->param);
+    // dom_2 = remove_param_cft(dom_2, rlt->param);
+    // dom_1 = remove_param_cft(dom_1, rlt->param);
     
     // simplify set representation
     dom_1 = isl_set_remove_redundancies(dom_1);
@@ -1760,7 +1763,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // Modify SCoP
     std::cout << "\n================= Modify SCoP =================" << std::endl;
     int ui_st = scop->n_stmt;
-    scop->n_stmt = scop->n_stmt + 2 + 1;
+    scop->n_stmt = scop->n_stmt + 2;
 
     // alloc new space
     isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[i_st]->body);
@@ -1908,6 +1911,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     /**********************
      **  Part 4 : All Fast
      **********************/
+    /*
     std::cout << "\n======= Part 4: ALL FAST " << std::endl;
     scop->stmts[ui_st+2] = isl_alloc_type(ctx, struct pet_stmt);
     scop->stmts[ui_st+2]->loc = scop->stmts[i_st]->loc;
@@ -1950,6 +1954,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     //s1 = pet_tree_foreach_access_expr(scop->stmts[ui_st+1]->body, change_stmt_id, p_id);
     isl_id_free(p_id);
     isl_set_free(dom_4);
+    */
     
   
     //assert(false);

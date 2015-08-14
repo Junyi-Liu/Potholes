@@ -1022,24 +1022,24 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   scop->delay = rlt.delay;
   int sw;
   if(rlt.param == NULL || isl_set_is_empty(rlt.param)){
+    
     // not able to apply transformation
-    std::cout << "\n*********** NO SAFE REGION FOUND ****************" << std::endl;
+    std::cout << "\n*********** NO SAFE REGION FOUND ****************" << std::endl;    
+    sw = 0;
+    
 #ifdef PLP
     std::cout << "Keep original codes " << std::endl;
-    sw = 0;
     scop->t = 0;
 #endif
     
 #ifdef LSP
     if(rlt.param == NULL){ 
       std::cout << "Keep original codes " << std::endl;
-      sw = 0;
       scop->t = 0;
     }
     else{
       // add pragmas for loop splitting
       std::cout << "Apply pragma for loop splitting" << std::endl;
-      sw = 0;
       scop->t = 2;
     }
 #endif
@@ -1057,22 +1057,21 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     std::cout << "\n*********** NOT ALWAYS IN SAFE REGION ****************" << std::endl;
     
     // apply safe range and add pragma
-#ifdef PLP
-    std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
     sw = 1;
     scop->t = 1;
+    
+#ifdef PLP
+    std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
 #endif
     
 #ifdef LSP
-    // add pragmas for loop splitting
+    // add pragma for loop splitting
     std::cout << "Apply pragma for loop splitting" << std::endl;
-    sw = 0;
-    scop->t = 2;
 #endif
     
   }
 
-
+  /*
   // Apply Loop Splitting based on conflict region
 #ifdef LSP
   if(scop->t == 2){
@@ -1089,8 +1088,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;
   }
 #endif
-  
-  isl_set_free(rlt.cft);  
+  */  
 
       
   /******************************************
@@ -1154,54 +1152,88 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     //if (argits != vm.end()) ss << "," << "\n";
   }
 
-
+  
   // ** Apply transformation HERE!!!!!!!!!!!!!!
+  std::cout << "\n*********** START GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl; 
   if(sw){
-    std::cout << "\n*********** START GENERATE SCOP WITH PARAMETRIC PIPELINING ****************" << std::endl;
-
-    // check universality at first !!!!!!!
-    //isl_set_plain_is_universe(param)
-    // isl_set_dump(param);
+    std::cout << "\n*********** Constructing If(safe): ALL FAST, Else: SLOW or SPLIT ****************" << std::endl; 
+    // generate if guard
     isl_ast_expr * p_expr = isl_ast_build_expr_from_set(build, isl_set_copy(rlt.param));
     isl_ast_expr_dump(p_expr);
 
+    // alloc if ast
     isl_ast_node * p_ast = isl_ast_node_alloc_if(p_expr);
-    isl_ast_node_dump(p_ast);
+    isl_ast_node_dump(p_ast);   
 
-    std::cout << "************* END GENERATE SCOP WITH PARAMETRIC PIPELINING ****************\n" << std::endl;     
-
+    std::cout << "\n*********** AST Node Generation of FAST mode ****************" << std::endl; 
     // generate the whole ast node corresponding to the SCoP and added into one list  
     // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
-
-    // std::string str = "fast";
-    // const char * loop_name = str.c_str();
-    // isl_ctx * ctx = isl_set_get_ctx(param);
-    // isl_id * loop_id = isl_id_alloc(ctx, loop_name, &vm);
-    // node = isl_ast_node_set_annotation(node, loop_id);
-    // isl_id_dump(isl_ast_node_get_annotation(node));
-
     //assert(false);
-
+    
+    // AST of fast mode
     p_ast->u.i.then = isl_ast_node_copy(node);
+
+    #ifdef LSP
+    std::cout << "\n************* START: SCoP Modification for Loop Splitting *************" << std::endl;  
+    // split scop
+    int lsp = splitLoop(pscop, &rlt);
+    std::cout << "\n************* END: SCoP Modification for Loop Splitting *************" << std::endl;
+
+    // control ast build
+    if(lsp){
+      std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
+      scop->t = 0;
+    }
+    else{
+      scop->t = 2;
+      schedule = pet_scop_collect_schedule(pscop);
+      domain = pet_scop_collect_domains(pscop);
+      schedule = isl_union_map_intersect_domain(schedule, domain);
+
+      isl_ast_node_free(node);
+      node = isl_ast_build_ast_from_schedule(build, schedule);
+    }
+    #endif
+
+    // AST of else mode: slow or split
+    std::cout << "\n*********** AST Node Generation of SLOW or SPLIT mode ****************" << std::endl; 
     p_ast->u.i.else_node = isl_ast_node_copy(node); 
     
     definitions_list = isl_ast_node_list_add(definitions_list, p_ast);  
     isl_ast_node_free(node);
   }
   else{
-    std::cout << "\n*********** START GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
-    // "isl_ast_build_ast_from_schedule" defined in isl_ast_codegen.c
+    std::cout << "\n*********** No All FAST mode applied ****************" << std::endl; 
+    
+    #ifdef LSP
+    if(scop->t == 2){
+      std::cout << "\n************* START: SCoP Modification for Loop Splitting *************" << std::endl;  
+      // split scop
+      int lsp = splitLoop(pscop, &rlt);
+      std::cout << "\n************* END: SCoP Modification for Loop Splitting *************" << std::endl;
+
+      isl_union_map_free(schedule);
+      schedule = pet_scop_collect_schedule(pscop);
+      domain = pet_scop_collect_domains(pscop);
+      schedule = isl_union_map_intersect_domain(schedule, domain);
+    }
+    #endif
+
+    // build AST
+    std::cout << "\n*********** AST Node Generation ****************" << std::endl; 
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
 
-    isl_ast_node_dump(node);
-    
+    // add to list for print
+    isl_ast_node_dump(node);    
     definitions_list = isl_ast_node_list_add(definitions_list, node);
-    std::cout << "\n*********** END GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
-  }
 
+  }
+  std::cout << "\n*********** END GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
+  
   // clean param set!!!!!!
   isl_set_free(rlt.param);
+  isl_set_free(rlt.cft);  
 
   std::cout << "\n*********** START PRINT SCOP ****************" << std::endl;
   
