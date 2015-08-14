@@ -273,11 +273,11 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
     // add dimension item with factor
     if(i < d_maff){
+      // take current dimension difference(distance)
       isl_aff * dim = isl_multi_aff_get_aff(maff, i);
 
       // check whether dependency is at the outer dimension
       if(i < stmt->n_it-1){
-
 	isl_constraint * dim_cst = isl_equality_from_aff(isl_aff_copy(dim));
 	isl_set * dim_set = isl_set_from_basic_set(isl_basic_set_from_constraint(dim_cst));
 	dim_set = isl_set_intersect(isl_set_copy(set), dim_set);
@@ -287,8 +287,11 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 	}
 	isl_set_free(dim_set);
       }
-      
+
+      // multiply with the size of previous dimensions 
       dim = isl_aff_mul(dim, isl_aff_copy(ftr));
+
+      // add to the final difference(distance)
       diff = isl_aff_add(diff, dim);
     }
     
