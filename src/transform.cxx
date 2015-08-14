@@ -277,10 +277,15 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 
       // check whether dependency is at the outer dimension
       if(i < stmt->n_it-1){
-	if(isl_aff_plain_is_zero(dim) == 0){
+
+	isl_constraint * dim_cst = isl_equality_from_aff(isl_aff_copy(dim));
+	isl_set * dim_set = isl_set_from_basic_set(isl_basic_set_from_constraint(dim_cst));
+	dim_set = isl_set_intersect(isl_set_copy(set), dim_set);
+	if(isl_set_is_empty(dim_set) == 1){
 	  outer_dep = 1;
-	  std::cout << "find outer dependency" << std::endl;
+	  std::cout << "Outer dependency is found" << std::endl;
 	}
+	isl_set_free(dim_set);
       }
       
       dim = isl_aff_mul(dim, isl_aff_copy(ftr));
