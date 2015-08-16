@@ -606,7 +606,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   rlt->delay = stmt.L_delay;
   // assume that delay will not increase over 1.2 times
   stmt.L_delay = ceil(float(stmt.L_delay)*1.2/float(stmt.II));
-  std::cout<< "*** Ceil( Delay/II ): " << stmt.L_delay << std::endl;  
+  std::cout<< "*** Ceil( Delay/II * 1.2 ): " << stmt.L_delay << std::endl;  
 
   // Make domain always non-empty
   // std::cout << "** Checking domain emptiness " << std::endl; 
