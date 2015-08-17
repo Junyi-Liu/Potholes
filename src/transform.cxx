@@ -1296,7 +1296,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   std::cout << "==== lexmax point: " << std::endl;     
   isl_set_dump(cft_lexmax);
   
-  assert(false);
+  //assert(false);
 
   std::cout << "==== Outer dimensions have dependence: " << rlt->outer_dep << std::endl; 
   
