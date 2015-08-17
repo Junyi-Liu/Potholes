@@ -1296,7 +1296,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   std::cout << "==== lexmax point: " << std::endl;     
   isl_set_dump(cft_lexmax);
   
-  //assert(false);
+  assert(false);
 
   std::cout << "==== Outer dimensions have dependence: " << rlt->outer_dep << std::endl; 
   
@@ -1650,47 +1650,6 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     dom_1 = isl_set_coalesce(dom_1);
     isl_set_dump(dom_1);
     
-    // Check bset number
-    int n_bs_1 = isl_set_n_basic_set(dom_1);
-    int n_bs_2 = isl_set_n_basic_set(dom_2);
-    int n_bs_3 = isl_set_n_basic_set(dom_3);
-    int n_bs = n_bs_1 + n_bs_2 + n_bs_3;
-    std::cout << "*** Sum of bset number : "<< n_bs << std::endl;
-    
-    int t = 0;
-    if(n_bs_1 > 3 || n_bs_2 > 3 || n_bs_3 > 3){
-      //if(n_bs_1 > 4){
-      std::cout << "==== Too many basic sets for loop splitting" << std::endl;
-      t = 0;
-    }
-    if(ds_lexmin == 1 && ds_3 == 1){
-      // Special Case: dom_1 and dom_3 are all empty
-      std::cout << "==== Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
-      t = 1;
-    }
-
-    // terminate early for applying parametric loop pipelining
-    if(t){
-      // recover statement counter and domains
-      scop->n_stmt = n_stmt;
-      for(int j=0; j<i_st; j++){
-	isl_set_free(scop->stmts[j]->domain);
-	scop->stmts[j]->domain = isl_set_copy(stmt_dom_rcd[j]);
-	isl_set_free(stmt_dom_rcd[j]);
-      }
-      // not fully cleaned !!!!!!!!!!!!
-      isl_set_free(stmt_dom_rcd[i_st]);
-      isl_set_free(dom_3);
-      isl_set_free(dom_2);
-      isl_set_free(dom_1);
-      isl_set_free(stmt_dom);  
-      isl_map_free(stmt_sch);  
-      isl_set_free(dom_lexmax);
-      isl_set_free(dom_lexmin);
-      isl_set_free(pnt_lexmin);
-      isl_set_free(pnt_lexmax);
-      return 1;
-    }
 
     //Special Case: dom_1 or dom_3 are not fully single
     dom_sep sep;
@@ -1745,6 +1704,50 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // dom_3 = remove_param_cft(dom_3, rlt->param);
     // dom_2 = remove_param_cft(dom_2, rlt->param);
     // dom_1 = remove_param_cft(dom_1, rlt->param);
+
+
+    // Check bset number
+    int n_bs_1 = isl_set_n_basic_set(dom_1);
+    int n_bs_2 = isl_set_n_basic_set(dom_2);
+    int n_bs_3 = isl_set_n_basic_set(dom_3);
+    int n_bs = n_bs_1 + n_bs_2 + n_bs_3;
+    std::cout << "*** Sum of bset number : "<< n_bs << std::endl;
+    
+    int t = 0;
+    if(n_bs_1 > 3 || n_bs_2 > 3 || n_bs_3 > 3){
+      //if(n_bs_1 > 4){
+      std::cout << "==== Too many basic sets for loop splitting" << std::endl;
+      t = 0;
+    }
+    if((isl_set_is_empty(dom_1) == 1 ) && (isl_set_is_empty(dom_3) == 1)){
+      // Special Case: dom_1 and dom_3 are all empty
+      std::cout << "==== Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
+      t = 1;
+    }
+
+    // terminate early for applying parametric loop pipelining
+    if(t){
+      // recover statement counter and domains
+      scop->n_stmt = n_stmt;
+      for(int j=0; j<i_st; j++){
+	isl_set_free(scop->stmts[j]->domain);
+	scop->stmts[j]->domain = isl_set_copy(stmt_dom_rcd[j]);
+	isl_set_free(stmt_dom_rcd[j]);
+      }
+      // not fully cleaned !!!!!!!!!!!!
+      isl_set_free(stmt_dom_rcd[i_st]);
+      isl_set_free(dom_3);
+      isl_set_free(dom_2);
+      isl_set_free(dom_1);
+      isl_set_free(stmt_dom);  
+      isl_map_free(stmt_sch);  
+      isl_set_free(dom_lexmax);
+      isl_set_free(dom_lexmin);
+      isl_set_free(pnt_lexmin);
+      isl_set_free(pnt_lexmax);
+      return 1;
+    }
+
     
     // simplify set representation
     dom_1 = isl_set_remove_redundancies(dom_1);

@@ -1173,12 +1173,12 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node * node = isl_ast_build_ast_from_schedule(build, schedule);
     //assert(false);
     
-    // AST of else mode: slow or split
+    // AST of fast mode: else statement
     p_ast->u.i.else_node = isl_ast_node_copy(node);
     
-    std::cout << "\n*********** AST Node Generation of SLOW or SPLIT mode ****************" << std::endl; 
 
-    #ifdef LSP
+
+#ifdef LSP
     std::cout << "\n************* START: SCoP Modification for Loop Splitting *************" << std::endl;  
     // split scop
     int lsp = splitLoop(pscop, &rlt);
@@ -1186,21 +1186,24 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 
     // control ast build
     if(lsp){
-      std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
+      std::cout << "Apply pragma for parametric loop pipelining" << std::endl;
       scop->t = 0;
     }
     else{
+      std::cout << "Apply pragma for loop splitting" << std::endl;
       scop->t = 2;
-      schedule = pet_scop_collect_schedule(pscop);
-      domain = pet_scop_collect_domains(pscop);
-      schedule = isl_union_map_intersect_domain(schedule, domain);
-
-      isl_ast_node_free(node);
-      node = isl_ast_build_ast_from_schedule(build, schedule);
     }
-    #endif
 
-    // AST of fast mode
+    schedule = pet_scop_collect_schedule(pscop);
+    domain = pet_scop_collect_domains(pscop);
+    schedule = isl_union_map_intersect_domain(schedule, domain);
+
+    std::cout << "\n*********** AST Node Generation of SLOW/SPLIT mode ****************" << std::endl; 
+    isl_ast_node_free(node);
+    node = isl_ast_build_ast_from_schedule(build, schedule);
+#endif
+
+    // AST of slow or split mode: then statement
     p_ast->u.i.then = isl_ast_node_copy(node);
     
     definitions_list = isl_ast_node_list_add(definitions_list, p_ast);  
