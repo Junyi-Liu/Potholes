@@ -122,6 +122,7 @@ struct pth_scop {
   VarMap * vm;
   int delay; //delay info
   int t; //tansformation config label
+  int blk_pos; // position for loop splitting by blocks
   //int pre_n_stmt;
 };
 

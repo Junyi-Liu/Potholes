@@ -740,8 +740,17 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     int unflt = strncmp(id_str, "unflt", 5); 
     //isl_id_dump(tuple_id);   
 
+    int p2_flw = strncmp(id_str, "flw_p2", 6);
+    if(scop->t == 3 && (p2 == 0 || p2_flw == 0)){
+      scop->t = 4;
+    }
+    
     // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);    
+
+    if(scop->t == 4 && (p2 == 0 || p2_flw == 0)){
+      scop->t = 3;
+    }
     
     // add control for print transformation pragma
     if(scop->t == 0){
@@ -752,7 +761,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
       stmt->t = 1;
       scop->t = -1;      
     }
-    else if(scop->t == 2){
+    else if(scop->t == 2 || scop->t == 3){
       // FOR LOOP SPLITTING  
       if( p1==0 || p3==0 || p4==0 || unflt==0){
 	stmt->t = 1; // fast pipelining	
@@ -1185,13 +1194,19 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     std::cout << "\n************* END: SCoP Modification for Loop Splitting *************" << std::endl;
 
     // control ast build
-    if(lsp){
+    if(lsp == 1){
       std::cout << "Apply pragma for parametric loop pipelining" << std::endl;
       scop->t = 0;
     }
     else{
       std::cout << "Apply pragma for loop splitting" << std::endl;
-      scop->t = 2;
+      if(lsp == 3){
+	// loop splitting by blocks
+	scop->t = 3;
+	scop->blk_pos = rlt.blk_pos;
+      }
+      else
+	scop->t = 2;
     }
 
     schedule = pet_scop_collect_schedule(pscop);
@@ -1219,6 +1234,12 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
       int lsp = splitLoop(pscop, &rlt);
       std::cout << "\n************* END: SCoP Modification for Loop Splitting *************" << std::endl;
 
+      // loop splitting by blocks
+      if(lsp == 3) {
+	scop->t = 3;
+	scop->blk_pos = rlt.blk_pos;
+      }
+      
       isl_union_map_free(schedule);
       schedule = pet_scop_collect_schedule(pscop);
       domain = pet_scop_collect_domains(pscop);
@@ -1240,7 +1261,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   // clean param set!!!!!!
   isl_set_free(rlt.param);
   isl_set_free(rlt.cft);  
-
+  isl_pw_aff_free(rlt.dist);  
+  
   std::cout << "\n*********** START PRINT SCOP ****************" << std::endl;
   
   // convert ast_node list into ast block node

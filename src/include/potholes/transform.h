@@ -107,6 +107,9 @@ struct stmt_info{
   // current iteration conflict region
   isl_set * cft;
 
+  // scalar dependence distance
+  isl_pw_aff * dist = NULL;
+  
   // outer dimensions have dependence
   int outer_dep = 1;
   
@@ -141,6 +144,12 @@ struct recur_info{
   // iteration conflict region
   isl_set * cft = NULL;
 
+  // scalar dependence distance in conflict region
+  isl_pw_aff * dist;
+
+  // dimension position for splitting loop by block
+  int blk_pos;
+  
   // all outer dimensions have dependence
   int outer_dep;
   
@@ -236,6 +245,27 @@ struct sch_info{
   int i;
 };
 typedef struct sch_info sch_info;
+
+// split the conflict(innermost) domain dimension by block
+struct blk_info{
+
+  // statement domain
+  isl_set * dom;
+
+  // split statement domain
+  isl_set * sp_dom;
+
+  // slow domain when dist==1
+  isl_set * slw_dom;
+  
+  // temp basic set of dom
+  isl_basic_set * bset;
+  
+  // split dimension postion
+  int pos;    
+
+};
+typedef struct blk_info blk_info;
 
 __isl_give pet_tree *pet_tree_dup(__isl_keep pet_tree *tree);
 
