@@ -123,6 +123,7 @@ struct pth_scop {
   int delay; //delay info
   int t; //tansformation config label
   int blk_pos; // position for loop splitting by blocks
+  isl_pw_aff * dist;
   //int pre_n_stmt;
 };
 
