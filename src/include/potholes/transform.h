@@ -112,6 +112,9 @@ struct stmt_info{
   
   // outer dimensions have dependence
   int outer_dep = 1;
+
+  // innermost conflict dep position
+  int dep_pos = -1;
   
   // statement memeory access info
   int n_acc_wr = 0; 

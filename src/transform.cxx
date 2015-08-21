@@ -261,6 +261,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   // flatten (src-snk)
   std::cout << "** Flattening for (src-snk)" << std::endl;
   int outer_dep = 0;
+  int dep_pos = stmt->n_it-1;
   isl_set * dom_no_divs = isl_set_remove_divs(isl_set_copy(stmt->domain));
   isl_space * sp = isl_multi_aff_get_domain_space(maff);
   isl_local_space * lsp = isl_local_space_from_space(sp);
@@ -282,8 +283,9 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
 	isl_set * dim_set = isl_set_from_basic_set(isl_basic_set_from_constraint(dim_cst));
 	dim_set = isl_set_intersect(isl_set_copy(set), dim_set);
 	if(isl_set_is_empty(dim_set) == 1){
+	  if(i < dep_pos) dep_pos = i;
 	  outer_dep = 1;
-	  std::cout << "Outer dependency is found" << std::endl;
+	  std::cout << "Outer dependency is found " << std::endl;
 	}
 	isl_set_free(dim_set);
       }
@@ -331,7 +333,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
   // snk-src -1 >=0
   // affine: sink-source = distance
   std::cout << "** Creating: snk-src-1 >= 0" << std::endl;
-  diff = isl_aff_sub(isl_aff_zero_on_domain(lsp), diff); //0 - (src-snk)
+  diff = isl_aff_sub(isl_aff_zero_on_domain(isl_local_space_copy(lsp)), diff); //0 - (src-snk)
   cst = isl_inequality_from_aff(isl_aff_copy(diff));
   // constant += -1
   c_val = isl_constraint_get_constant_val(cst);
@@ -390,6 +392,7 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     if(outer_dep == 0) stmt->outer_dep = 0;
 
     // store flattened dependence distance in pw_aff with conflict region
+    /*
     isl_pw_aff * dist = isl_pw_aff_from_aff(isl_aff_copy(diff));
     dist = isl_pw_aff_reset_tuple_id(dist, isl_dim_in);
     //dist = isl_pw_aff_intersect_domain(dist, isl_set_copy(bd));
@@ -401,16 +404,47 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
       stmt->dist = isl_pw_aff_copy(dist);
     }
     // isl_pw_aff_dump(dist);
+    */
+
+
+    // store innermost conflict dependence distance in pw_aff with conflict region
+    std::cout << "Current inner conflict dep pos:  " << dep_pos << std::endl;
+    isl_aff * dist_aff = isl_multi_aff_get_aff(maff, dep_pos);
+    dist_aff = isl_aff_sub(isl_aff_zero_on_domain(isl_local_space_copy(lsp)), dist_aff); // 0-(src-snk)
+    isl_pw_aff * dist = isl_pw_aff_from_aff(dist_aff);
+    dist = isl_pw_aff_reset_tuple_id(dist, isl_dim_in);
+    dist = isl_pw_aff_intersect_params(dist, isl_set_complement(isl_set_copy(empty)));
+    
+    if(stmt->dep_pos == -1){
+      // first record
+      stmt->dep_pos = dep_pos;
+      stmt->dist = isl_pw_aff_copy(dist);
+    }
+    else if(stmt->dep_pos == dep_pos){
+      // take min distance
+      stmt->dist = isl_pw_aff_union_min(stmt->dist, isl_pw_aff_copy(dist));      
+    }
+    else if(stmt->dep_pos < dep_pos){
+      // found inner dep pos, discard previous record
+      stmt->dep_pos = dep_pos;
+      isl_pw_aff_free(stmt->dist);
+      stmt->dist = isl_pw_aff_copy(dist);      
+    }        
+    isl_pw_aff_free(dist);
     
   }
 
   //assert(false);
 
+  std::cout << "** param set : " << std::endl;
   isl_set_dump(stmt->param);
 
   std::cout << "** dep distance : " << std::endl;
   isl_pw_aff_dump(stmt->dist);
-  
+  //assert(false);
+
+  isl_local_space_free(lsp);
+  isl_multi_aff_free(maff);
   isl_aff_free(diff);
   isl_set_free(empty);
   isl_set_free(bd);
@@ -1322,17 +1356,16 @@ int dim_blk(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user){
   std::cout << "*** current param piece: " << std::endl;
   isl_set_dump(set);
   std::cout << "*** current dist affine: " << std::endl;
-  aff = isl_aff_insert_dims(aff, isl_dim_in, blk->pos, 1);
   isl_aff_dump(aff);  
-
+    
   // set up space
-  isl_space * sp = isl_set_get_space(blk->dom);
+  isl_space * sp = isl_set_get_space(set);
   isl_local_space * lsp = isl_local_space_from_space(sp);
   
   // check distance = 1
   isl_ctx * ctx = isl_local_space_get_ctx(lsp);
   isl_val * one = isl_val_one(ctx);
-  isl_aff * aff_one = isl_aff_val_on_domain(isl_local_space_copy(lsp), one);
+  isl_aff * aff_one = isl_aff_val_on_domain(lsp, one);
   
   // find the piece when distance = 1
   if(isl_aff_plain_is_equal(aff, aff_one) == 1){
@@ -1342,9 +1375,16 @@ int dim_blk(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user){
     isl_aff_free(aff_one);
     std::cout << "*** finish current piece ***" << std::endl;
     return 0;    
-  }
+  }  
+  isl_aff_free(aff_one);
+
+  // insert block dim in dist
+  set = isl_set_insert_dims(set, isl_dim_set, blk->pos, 1);
+  aff = isl_aff_insert_dims(aff, isl_dim_in, blk->pos, 1);
   
   // create new upper bound
+  sp = isl_set_get_space(set);
+  lsp = isl_local_space_from_space(sp);
   isl_aff * itr = isl_aff_var_on_domain(isl_local_space_copy(lsp), isl_dim_set, blk->pos+1);
   isl_aff * new_itr = isl_aff_var_on_domain(lsp, isl_dim_set, blk->pos);
   
@@ -1356,11 +1396,10 @@ int dim_blk(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user){
   isl_val * c_val = isl_constraint_get_constant_val(cst);
   int c_num = isl_val_get_num_si(c_val);
   isl_val_free(c_val);
-  cst = isl_constraint_set_constant_si(cst, c_num - 1);
+  cst = isl_constraint_set_constant_si(cst, c_num - 1);  
   isl_set * dom = isl_set_add_constraint(isl_set_copy(blk->dom), cst);
-
+  
   // add into new domain
-  set = isl_set_insert_dims(set, isl_dim_set, blk->pos, 1);
   dom = isl_set_intersect_params(dom, set);
   blk->sp_dom = isl_set_union(blk->sp_dom, dom);
   
@@ -1398,11 +1437,25 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   isl_set_dump(cft_lexmax);
 
   // show scalar dependence distance
-  std::cout << "==== flattened dependence distance: " << std::endl;    
+  std::cout << "==== dependence distance at conflict dim: " << std::endl;    
   isl_pw_aff_dump(rlt->dist);
   int iter_in_dist = isl_pw_aff_involves_dims(rlt->dist, isl_dim_in, 0, isl_pw_aff_dim(rlt->dist, isl_dim_in));
   std::cout << "** contain iterators : " << iter_in_dist << std::endl;
+
+  // early check dist == 1
+  int dist_is_one = 0;
+  isl_local_space * dist_lsp = isl_local_space_from_space(isl_pw_aff_get_domain_space(rlt->dist));
+  isl_val * val_one = isl_val_one(isl_local_space_get_ctx(dist_lsp));      
+  isl_pw_aff * one = isl_pw_aff_from_aff(isl_aff_val_on_domain(dist_lsp, val_one));
+  one = isl_pw_aff_intersect_params(one, isl_pw_aff_params(isl_pw_aff_copy(rlt->dist)));        
+  if(isl_pw_aff_plain_is_equal(one, rlt->dist) == 1){
+    dist_is_one = 1;
+  }
+  isl_pw_aff_free(one);
+  std::cout << "** dist is equal to one: " << dist_is_one << std::endl;
   
+  // control the insert of block step statement
+  int step_status = 0; 
   //assert(false);
 
   std::cout << "==== Outer dimensions have dependence: " << rlt->outer_dep << std::endl; 
@@ -1411,6 +1464,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   std::cout << "==== Number of statements in SCoP: "<< scop->n_stmt << std::endl;
   int n_stmt = scop->n_stmt;
   isl_set * stmt_dom_rcd[n_stmt]; //statement domain record
+  int i_dim;
 
   for(int i_st=0; i_st < n_stmt; i_st++){
     //int i_st = 0;
@@ -1481,7 +1535,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // detect bound aff
     int n_d = (n_cd < n_dd) ? n_cd : n_dd;
-    int i_dim = -1;
+    i_dim = -1;
     // isl_aff * s_dsize;
     // isl_aff * c_dsize;
     int eq_d;
@@ -1513,8 +1567,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     }
     
     // dependency locates in the inner-most dimension and across the outer dimension
-    //if(i_dim == n_cd-1 && rlt->outer_dep == 1){
-    if(rlt->outer_dep == 1){
+    if(i_dim == n_cd-1 && rlt->outer_dep == 1){
+    //if(rlt->outer_dep == 1){
       std::cout << "\n======= Cut innermost dimension by unflatten loop " << std::endl;
 
       std::cout << "\n================= Modify SCoP =================" << std::endl;
@@ -1574,7 +1628,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     //assert(false);
 
     // cut conflict dimension (innermost) by blocks
-    if(iter_in_dist != 1 && i_dim == n_dd-1){
+    //if(iter_in_dist != 1 && i_dim == n_dd-1){
+    if(iter_in_dist != 1 && dist_is_one == 0){
       std::cout << "\n======= Cut conflict (innermost) dimension by blocks: " << std::endl;
       rlt->blk_pos = i_dim;
       isl_set * slw_dom = isl_set_copy(stmt_dom);
@@ -1612,8 +1667,22 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       blk.dom = isl_set_copy(stmt_dom);
       blk.sp_dom = isl_set_empty(isl_set_get_space(stmt_dom));
       blk.slw_dom = isl_set_empty(isl_set_get_space(slw_dom));
-      s_blk = isl_pw_aff_foreach_piece(rlt->dist, dim_blk, &blk);      
+
+      // match dim, only drop additional dims in distance
+      // Not consider: dims in dist < dom !!!!!!!
+      std::cout << "== match dims of dist: " << std::endl;
+      isl_pw_aff * dist = isl_pw_aff_copy(rlt->dist);
+      int e = isl_set_dim(blk.dom, isl_dim_set) -1; // minus one blk dim 
+      int d = isl_pw_aff_dim(dist, isl_dim_in) - e;
+      if(d>0){
+	dist = isl_pw_aff_drop_dims(dist, isl_dim_in, e, d);
+      }
+      isl_pw_aff_dump(dist);
       
+      // add blk bound
+      s_blk = isl_pw_aff_foreach_piece(dist, dim_blk, &blk);
+
+      // add new doms
       std::cout << "== new dom: " << std::endl;
       isl_set_free(stmt_dom);
       stmt_dom = isl_set_copy(blk.sp_dom);
@@ -1720,7 +1789,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       /**************
        **  Part 1.1: Step Increment Expression
        **************/
-      if(sch_dim_first == 1){
+      if(sch_dim_first == 1 && step_status == 0){
+	step_status = 1;
+	
 	std::cout << "\n======= Part 1.1 " << std::endl;
 	int ui_st = scop->n_stmt;
 	scop->n_stmt = scop->n_stmt + 1;
@@ -1749,7 +1820,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 	
 	std::cout << "*** Stmt body: " << std::endl;	
 	pet_expr * one = pet_expr_new_int(isl_val_one(ctx));
-	isl_pw_aff * dist = isl_pw_aff_insert_dims(isl_pw_aff_copy(rlt->dist), isl_dim_in, i_dim, 1);
+        dist = isl_pw_aff_insert_dims(dist, isl_dim_in, i_dim, 1);
 	dist = isl_pw_aff_set_tuple_id(dist, isl_dim_in, isl_id_copy(p_id));
 	isl_multi_pw_aff * index = isl_multi_pw_aff_from_pw_aff(isl_pw_aff_copy(dist));
 	isl_multi_pw_aff_dump(index);
@@ -1769,11 +1840,11 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 	scop->stmts[ui_st]->body = pet_tree_new_expr(blk_itr);
 	scop->stmts[ui_st]->body->loc = scop->stmts[i_st]->loc;
 
-	isl_pw_aff_free(dist);
 	isl_id_free(p_id);
       }
       isl_aff_free(new_itr);
       isl_map_free(step_sch);
+      isl_pw_aff_free(dist);
       //assert(false);
 
       
@@ -2317,12 +2388,18 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   isl_set_free(cft_lexmin);
   isl_set_free(cft_lexmax);
   isl_set_free(cft_no_divs);
+
+  // assign return value
+  int rtn_val;
+  if(i_dim == n_cd-1 && rlt->outer_dep == 1){
+    rtn_val = 0;
+  }
+  else if (iter_in_dist != 1 && dist_is_one == 0){
+    rtn_val = 3;    
+  }
+  else
+    rtn_val = 0;
   
-  if(iter_in_dist != 1 && rlt->outer_dep != 1){
-    return 3;
-  }
-  else{
-    return 0;
-  }
+  return rtn_val;
 }
 
