@@ -260,6 +260,9 @@ struct blk_info{
 
   // slow domain when dist==1
   isl_set * slw_dom;
+
+  // new dist after insert blk dim
+  isl_pw_aff * dist;
   
   // temp basic set of dom
   isl_basic_set * bset;

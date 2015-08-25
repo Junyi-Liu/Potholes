@@ -995,7 +995,8 @@ isl_ast_expr * pth_generate_access_expr(pth_ast_build * build, pth_scop * scop, 
     isl_map_dump(amap);
 
     // for loop splitting by blocks
-    if(scop->t == 3 && (isl_map_dim(amap, isl_dim_in) >= (scop->blk_pos + 1) )){
+    //&& (isl_map_dim(amap, isl_dim_in) >= (scop->blk_pos + 1) )
+    if(scop->t == 3){
       amap = isl_map_insert_dims(amap, isl_dim_in, scop->blk_pos, 1);
       isl_map_dump(amap);
     }

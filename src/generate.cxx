@@ -736,22 +736,28 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     int p1 = strncmp(id_str, "p1", 2);
     int p2 = strncmp(id_str, "p2", 2);
     int p3 = strncmp(id_str, "p3", 2);
-    int p4 = strncmp(id_str, "p4", 2);
+    int blk = strncmp(id_str, "blk", 3);
     int unflt = strncmp(id_str, "unflt", 5); 
     //isl_id_dump(tuple_id);
 
-    // for slow mode in splitting by block
-    int p2_flw = strncmp(id_str, "flw_p2", 6);
-    if(scop->t == 3 && (p2 == 0 || p2_flw == 0)){
-      scop->t = 4;
+    // for splitting by block
+    int flw_blk = strncmp(id_str, "flw_blk", 7);
+    int step_blk = strncmp(id_str, "step_blk", 8);
+    if(blk == 0 || flw_blk == 0 || step_blk == 0){
+      std::cout << "== Found blocked statements " << std::endl;
+      scop->t = 3;
     }
     
     // generate ast_stmt
     pth_ast_stmt * stmt = pth_generate_ast_stmt(pth_ast_build_from_isl_ast_build(build), scop, tuple_id);    
 
-    // for slow mode in splitting by block
-    if(scop->t == 4 && (p2 == 0 || p2_flw == 0)){
-      scop->t = 3;
+    // // for slow mode in splitting by block
+    // if(scop->t == 4 && (p2 == 0 || p2_flw == 0)){
+    //   scop->t = 3;
+    // }
+
+    if(blk == 0 || flw_blk == 0 || step_blk == 0){
+      scop->t = 2;
     }
     
     // add control for print transformation pragma
@@ -763,9 +769,9 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
       stmt->t = 1;
       scop->t = -1;      
     }
-    else if(scop->t == 2 || scop->t == 3){
+    else if(scop->t == 2){
       // FOR LOOP SPLITTING  
-      if( p1==0 || p3==0 || p4==0 || unflt==0){
+      if( p1==0 || p3==0 || blk==0 || unflt==0){
 	stmt->t = 1; // fast pipelining	
       }
       else if(p2==0){
@@ -788,8 +794,8 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
 
     // check whether dist == 1 at current param piece    
-    if(scop->t == 3 && p1 == 0){
-      std::cout << "=== Check whether dist == 1 " << std::endl;
+    if(blk == 0){
+      std::cout << "=== Check whether dist is equal to 1 ===" << std::endl;
       
       isl_set * param_node = isl_union_map_params(isl_union_map_copy(pbuild->executed));
       isl_set_dump(param_node);
@@ -808,8 +814,11 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
       
       if(isl_pw_aff_plain_is_equal(one, dist_node) == 1){
       	stmt->t = 0; // default pipelining
+	std::cout << "=== Equal to 1 " << std::endl;
       	std::cout << "=== turn off fast pipelining " << std::endl;
       }
+      else
+	std::cout << "=== Not equal to 1 " << std::endl;
 
       isl_set_free(node);
       isl_pw_aff_free(one);
@@ -1233,17 +1242,19 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
       std::cout << "Apply pragma for parametric loop pipelining" << std::endl;
       scop->t = 0;
     }
-    else if(lsp == 3){
-      std::cout << "Apply pragma for loop splitting by blocks" << std::endl;
-      // loop splitting by blocks
-      scop->t = 3;
+    // else if(lsp == 3){
+    //   std::cout << "Apply pragma for loop splitting by blocks" << std::endl;
+    //   // loop splitting by blocks
+    //   scop->t = 3;
+    //   scop->blk_pos = rlt.blk_pos;
+    //   scop->dist = isl_pw_aff_copy(rlt.dist);
+    //   //scop->dist = rlt.dist;
+    // }
+    else{
+      std::cout << "Apply pragma for loop splitting " << std::endl;
+      scop->t = 2;
       scop->blk_pos = rlt.blk_pos;
       scop->dist = isl_pw_aff_copy(rlt.dist);
-      //scop->dist = rlt.dist;
-    }
-    else{
-      std::cout << "Apply pragma for loop splitting by parts" << std::endl;
-      scop->t = 2;
     }
 
     //pet_scop_dump(pscop);
@@ -1283,12 +1294,12 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
       std::cout << "\n************* END: SCoP Modification for Loop Splitting *************" << std::endl;
 
       // loop splitting by blocks
-      if(lsp == 3) {
-	scop->t = 3;
-	scop->blk_pos = rlt.blk_pos;
-	scop->dist = isl_pw_aff_copy(rlt.dist);
+      //if(lsp == 3) {
+      //scop->t = 3;
+      scop->blk_pos = rlt.blk_pos;
+      scop->dist = isl_pw_aff_copy(rlt.dist);
 	//scop->dist = rlt.dist;
-      }
+	//}
       
       isl_union_map_free(schedule);
       schedule = pet_scop_collect_schedule(pscop);
