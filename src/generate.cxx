@@ -736,6 +736,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     int p1 = strncmp(id_str, "p1", 2);
     int p2 = strncmp(id_str, "p2", 2);
     int p3 = strncmp(id_str, "p3", 2);
+    int px = strncmp(id_str, "px", 2);
     int blk = strncmp(id_str, "blk", 3);
     int unflt = strncmp(id_str, "unflt", 5); 
     //isl_id_dump(tuple_id);
@@ -771,7 +772,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
     else if(scop->t == 2){
       // FOR LOOP SPLITTING  
-      if( p1==0 || p3==0 || blk==0 || unflt==0){
+      if( p1==0 || p3==0 || px == 0 || blk==0 || unflt==0){
 	stmt->t = 1; // fast pipelining	
       }
       else if(p2==0){
