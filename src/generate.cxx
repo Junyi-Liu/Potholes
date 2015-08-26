@@ -1320,7 +1320,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   }
   
 #ifdef LSP
-  if(lsp == 3) isl_pw_aff_free(scop->dist);
+  if(scop->t == 2) isl_pw_aff_free(scop->dist);
 #endif
   
   std::cout << "\n*********** END GENERATE SCOP WITH TRANSFORMATION ****************" << std::endl;
