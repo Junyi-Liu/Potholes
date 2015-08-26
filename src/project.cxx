@@ -30,7 +30,8 @@ potholes::Project::Project(int val, const char * argv[]) {
     //int success = Tool->run(newFrontendActionFactory(&factory, callback));
 
     int success = analysis->Tool->run(newFrontendActionFactory(&factory, callback));
-    
+
+    delete callback;    
     std::cout << "Tool success" << std::endl;
     
     if (success) {
