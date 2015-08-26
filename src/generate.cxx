@@ -1345,7 +1345,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
 
   std::cout << "\n*********** END PRINT SCOP ****************\n" << std::endl;
   
-  // isl_ast_build_free(build);
+  isl_ast_build_free(build);
   //std::cout << " FREE !!!!!!!" << std::endl;
   isl_ast_node_free(block);
   isl_printer_free(printer);
