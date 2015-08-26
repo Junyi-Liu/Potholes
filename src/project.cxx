@@ -28,7 +28,9 @@ potholes::Project::Project(int val, const char * argv[]) {
     //int success = Tool->run(Action);
 	    
     int success = Tool->run(newFrontendActionFactory(&factory, callback));
-            
+
+    std::cout << "Tool success" << std::endl;
+    
     if (success) {
       potholes::Analysis::Files files =  callback->getTransformedFiles();
     } else { 
@@ -39,7 +41,6 @@ potholes::Project::Project(int val, const char * argv[]) {
     // Need to throw an exception here. 
     std::cout << "Not Found" << "\n";
   }
-        
         
   /*   
 
