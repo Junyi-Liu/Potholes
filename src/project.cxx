@@ -22,14 +22,13 @@ potholes::Project::Project(int val, const char * argv[]) {
     callback = new potholes::RewriteCallback(rewriter, *analysis, std::cout);
 
     potholes::ConsumerFactory factory(rewriter, *analysis, *callback);
-    //clang::tooling::ClangTool * Tool = analysis->Tool;
+    clang::tooling::ClangTool * Tool = analysis->Tool;
 
-    //ToolAction * Action  = newFrontendActionFactory(&factory, callback);
-    //int success = Tool->run(Action);
+    clang::tooling::ToolAction * Action  = newFrontendActionFactory(&factory, callback);
+    int success = Tool->run(Action);
 
     //int success = Tool->run(newFrontendActionFactory(&factory, callback));
 
-    int success = analysis->Tool->run(newFrontendActionFactory(&factory, callback));
 
     delete callback;    
     std::cout << "Tool success" << std::endl;
