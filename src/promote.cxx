@@ -104,9 +104,13 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	    clang::SourceLocation file_start = sm.getLocForStartOfFile(sm.translateFile(fe));
 	    clang::SourceLocation fs = file_start.getLocWithOffset(start);
 	    clang::SourceLocation fe = file_start.getLocWithOffset(finish);
+
+	    std::stringstream ss;
+
+	    ss << pth_generate_scop_function_replace(scop->scop, function_name);
 	    
 	    //Junyi
-	    rewriter.ReplaceText(clang::SourceRange(fs, fe), pth_generate_scop_function_replace(scop->scop, function_name));
+	    rewriter.ReplaceText(clang::SourceRange(fs, fe), ss.str());
 
 	  }
 	}
