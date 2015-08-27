@@ -14,8 +14,9 @@ set process_pid [pid]
 puts "The process pid = $process_pid"
 
 #after 10000
-after 1000
+after 3000
 
+#set database "/Users/Junyi/research/HLS/application/benchmarks/compile_commands.json"
 set database "/Users/Junyi/research/HLS/application/pth_play/compile_commands.json"
 
 # construct analysis object
@@ -37,6 +38,5 @@ foreach scop [$analysis get -scops] {
 set solution "Solution_test"
 set project [Potholes::Project #auto $analysis $solution]
 
-itcl::delete object $project
 itcl::delete object $analysis
-
+itcl::delete object $project

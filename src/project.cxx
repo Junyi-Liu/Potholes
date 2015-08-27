@@ -31,8 +31,7 @@ potholes::Project::Project(int val, const char * argv[]) {
 
     //int success = Tool->run(newFrontendActionFactory(&factory, callback));
 
-    free(Action);
-    delete callback;    
+    free(Action);   
     std::cout << "Tool success" << std::endl;
     
     if (success) {
@@ -40,7 +39,9 @@ potholes::Project::Project(int val, const char * argv[]) {
     } else { 
       // throw exception
     }
-            
+
+    delete callback; 
+    
   } else { 
     // Need to throw an exception here. 
     std::cout << "Not Found" << "\n";
