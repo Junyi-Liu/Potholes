@@ -25,11 +25,13 @@ potholes::Project::Project(int val, const char * argv[]) {
     clang::tooling::ClangTool * Tool = analysis->Tool;
 
     clang::tooling::ToolAction * Action  = newFrontendActionFactory(&factory, callback);
+    std::cout << "Tool set" << std::endl;
+    
     int success = Tool->run(Action);
 
     //int success = Tool->run(newFrontendActionFactory(&factory, callback));
 
-
+    free(Action);
     delete callback;    
     std::cout << "Tool success" << std::endl;
     
