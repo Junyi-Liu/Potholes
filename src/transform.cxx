@@ -1974,6 +1974,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       std::cout << "\n================= Modify SCoP =================" << std::endl;
       int ui_st = scop->n_stmt;
       scop->n_stmt = scop->n_stmt + 2;
+      scop->stmts = (pet_stmt **)(realloc(scop->stmts, sizeof(pet_stmt *)*scop->n_stmt));
 
       // alloc new space
       isl_ctx * ctx = pet_tree_get_ctx(scop->stmts[i_st]->body);
@@ -2311,6 +2312,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 	std::cout << "\n======= Part 2.1 " << std::endl;
 	int ui_st = scop->n_stmt;
 	scop->n_stmt = scop->n_stmt + 1;
+	scop->stmts = (pet_stmt **)(realloc(scop->stmts, sizeof(pet_stmt *)*scop->n_stmt));
 	scop->stmts[ui_st] = isl_alloc_type(ctx, struct pet_stmt);
 	scop->stmts[ui_st]->loc = scop->stmts[i_st]->loc;
 	
@@ -2375,6 +2377,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 	std::cout << "\n======= Part 2 : dist is equal to one" << std::endl;
 	int ui_st = scop->n_stmt;
 	scop->n_stmt = scop->n_stmt + 1;
+	scop->stmts = (pet_stmt **)(realloc(scop->stmts, sizeof(pet_stmt *)*scop->n_stmt));
 	scop->stmts[ui_st] = isl_alloc_type(ctx, struct pet_stmt);
 	scop->stmts[ui_st]->loc = scop->stmts[i_st]->loc;
 

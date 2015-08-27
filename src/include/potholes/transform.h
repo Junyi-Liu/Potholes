@@ -12,6 +12,8 @@
 #include <potholes/rewrite.h>
 #include <potholes/consumer.h>
 
+#include <potholes/generate.h>
+
 namespace potholes { 
 
   class Transform : public potholes::Consumer, potholes::Rewriter { 

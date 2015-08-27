@@ -81,17 +81,18 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 
     if (scop) {
       // pet_scop_dump(scop->scop);
-
-      // ** Analyze Scop HERE !!!!!!!!!!
-      // isl_set * param = NULL;
-      //isl_set * param = analyzeScop(scop->scop);
       
+      // get transformed scop in string
+      std::stringstream ss;
+      ss << pth_generate_scop_function_replace(scop->scop, function_name);
+      //std::cout << ss.str() <<std::endl;
+
       // get scop location information
       unsigned start = pet_loc_get_start(scop->scop->loc);
       unsigned finish = pet_loc_get_end(scop->scop->loc);
       //unsigned start = scop->scop->start;
       //unsigned finish = scop->scop->end;
-
+      
       clang::SourceManager & sm = rewriter.getSourceMgr();
       clang::SourceManager::fileinfo_iterator fit;
 
@@ -104,10 +105,6 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	    clang::SourceLocation file_start = sm.getLocForStartOfFile(sm.translateFile(fe));
 	    clang::SourceLocation fs = file_start.getLocWithOffset(start);
 	    clang::SourceLocation fe = file_start.getLocWithOffset(finish);
-
-	    std::stringstream ss;
-
-	    ss << pth_generate_scop_function_replace(scop->scop, function_name);
 	    
 	    //Junyi
 	    rewriter.ReplaceText(clang::SourceRange(fs, fe), ss.str());
@@ -115,7 +112,7 @@ void potholes::PromoteScop::removeScop(clang::Rewriter& rewriter) {
 	  }
 	}
       }
-
+      
       // isl_set_free(param);     
       
     }

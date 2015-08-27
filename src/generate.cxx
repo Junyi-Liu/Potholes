@@ -976,6 +976,8 @@ isl_printer * pth_print_user_statement(isl_printer * printer, isl_ast_print_opti
       }
     }
 
+    isl_id_free(statement_id);
+
   }
   
   return printer;
@@ -1124,25 +1126,6 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     
   }
 
-  /*
-  // Apply Loop Splitting based on conflict region
-#ifdef LSP
-  if(scop->t == 2){
-    std::cout << "\n************* CONFLICT REGION LEXICO PLAY *************" << std::endl;  
-    // split scop
-    int lsp = splitLoop(pscop, &rlt);
-
-    if(lsp){
-      std::cout << "Apply pragma for false inter-dependency under safe region" << std::endl;
-      sw = 1;
-      scop->t = 1;
-    }
-
-    std::cout << "\n************* CONFLICT REGION LEXICO END *************" << std::endl;
-  }
-#endif
-  */  
-
       
   /******************************************
    **  Code Generation
@@ -1243,14 +1226,6 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
       std::cout << "Apply pragma for parametric loop pipelining" << std::endl;
       scop->t = 0;
     }
-    // else if(lsp == 3){
-    //   std::cout << "Apply pragma for loop splitting by blocks" << std::endl;
-    //   // loop splitting by blocks
-    //   scop->t = 3;
-    //   scop->blk_pos = rlt.blk_pos;
-    //   scop->dist = isl_pw_aff_copy(rlt.dist);
-    //   //scop->dist = rlt.dist;
-    // }
     else{
       std::cout << "Apply pragma for loop splitting " << std::endl;
       scop->t = 2;
@@ -1261,14 +1236,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     //pet_scop_dump(pscop);
     
     //assert(false);
-    domain = pet_scop_collect_domains(pscop);
-    // isl_union_set_dump(domain);
-    // std::cout << "XXXXXX" << std::endl;
-    
+    domain = pet_scop_collect_domains(pscop);    
     schedule = pet_scop_collect_schedule(pscop);
-    // std::cout << "XXXXXX" << std::endl;
-    // isl_union_map_dump(schedule);
-
     schedule = isl_union_map_intersect_domain(schedule, domain);
 
 
@@ -1295,12 +1264,8 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
       std::cout << "\n************* END: SCoP Modification for Loop Splitting *************" << std::endl;
 
       // loop splitting by blocks
-      //if(lsp == 3) {
-      //scop->t = 3;
       scop->blk_pos = rlt.blk_pos;
       scop->dist = isl_pw_aff_copy(rlt.dist);
-	//scop->dist = rlt.dist;
-	//}
       
       isl_union_map_free(schedule);
       schedule = pet_scop_collect_schedule(pscop);
@@ -1356,7 +1321,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   free(scop->array_offsets);
   free(scop);
 
-  std::cout << " FREE !!!!!!!" << std::endl;
+  //std::cout << " FREE !!!!!!!" << std::endl;
   
   return ss.str();
 }

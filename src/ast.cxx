@@ -234,7 +234,7 @@ pth_scop * pth_scop_alloc(pet_scop * pscop) {
 }
 pth_scop * pth_scop_insert_stmt(pth_scop* scop, pth_ast_stmt* stmt) {
   scop->n_stmt +=1;
-  scop->stmts = (pth_ast_stmt **)(realloc(scop->stmts, sizeof(pth_stmt *) * scop->n_stmt));
+  scop->stmts = (pth_ast_stmt **)(realloc(scop->stmts, sizeof(pth_ast_stmt *) * scop->n_stmt));
   scop->stmts[scop->n_stmt -1] = stmt;
   return scop;
     
