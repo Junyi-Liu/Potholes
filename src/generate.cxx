@@ -1354,7 +1354,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     free(scop->stmts[i]);
   }
   free(scop->stmts);
-  //free(scop->array_offsets);
+  free(scop->array_offsets);
   free(scop);
   
   return ss.str();

@@ -225,7 +225,7 @@ pth_id * pth_array_offset_lookup(pth_array_offset_p list, pth_id * id) {
 } 
 
 pth_scop * pth_scop_alloc(pet_scop * pscop) { 
-  pth_scop * scop = (pth_scop *)(malloc(sizeof(pet_scop)));
+  pth_scop * scop = (pth_scop *)(malloc(sizeof(pth_scop)));
   scop->n_stmt = 0;
   scop->scop = pscop;
   scop->stmts = (pth_ast_stmt **)(malloc(sizeof(pth_ast_stmt *)));
