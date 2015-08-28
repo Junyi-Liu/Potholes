@@ -411,6 +411,14 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
     std::cout << "Current inner conflict dep pos:  " << dep_pos << std::endl;
     isl_aff * dist_aff = isl_multi_aff_get_aff(maff, dep_pos);
     dist_aff = isl_aff_sub(isl_aff_zero_on_domain(isl_local_space_copy(lsp)), dist_aff); // 0-(src-snk)
+
+    // detect whether itr of conflict dim has lower than -1 coefficient in distance
+    isl_val * dep_coeff = isl_aff_get_coefficient_val(dist_aff, isl_dim_in, dep_pos);
+    int dist_neg_2 = 0;
+    if(isl_val_cmp_si(dep_coeff, -1) == -1){
+      dist_neg_2 = 1;
+    }
+    
     isl_pw_aff * dist = isl_pw_aff_from_aff(dist_aff);
     dist = isl_pw_aff_reset_tuple_id(dist, isl_dim_in);
     dist = isl_pw_aff_intersect_params(dist, isl_set_complement(isl_set_copy(empty)));
@@ -419,16 +427,19 @@ int check_multi_aff_diff(isl_set * set, isl_multi_aff * maff, void * user){
       // first record
       stmt->dep_pos = dep_pos;
       stmt->dist = isl_pw_aff_copy(dist);
+      stmt->dist_neg_2 = dist_neg_2;
     }
     else if(stmt->dep_pos == dep_pos){
       // take min distance
-      stmt->dist = isl_pw_aff_union_min(stmt->dist, isl_pw_aff_copy(dist));      
+      stmt->dist = isl_pw_aff_union_min(stmt->dist, isl_pw_aff_copy(dist));
+      if(dist_neg_2 == 1) stmt->dist_neg_2 = dist_neg_2;
     }
     else if(stmt->dep_pos < dep_pos){
       // found inner dep pos, discard previous record
       stmt->dep_pos = dep_pos;
       isl_pw_aff_free(stmt->dist);
-      stmt->dist = isl_pw_aff_copy(dist);      
+      stmt->dist = isl_pw_aff_copy(dist);
+      stmt->dist_neg_2 = dist_neg_2;      
     }        
     isl_pw_aff_free(dist);
     
@@ -797,7 +808,9 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   rlt->cft = isl_set_copy(stmt.cft);
   rlt->outer_dep = stmt.outer_dep;
   rlt->dist = isl_pw_aff_copy(stmt.dist);
-
+  rlt->dep_pos = stmt.dep_pos;
+  rlt->dist_neg_2 = stmt.dist_neg_2;
+  
   //assert(false);
   
   // Free isl objects
@@ -1534,6 +1547,10 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   }
   isl_pw_aff_free(one);
   std::cout << "** dist is equal to one: " << dist_is_one << std::endl;
+
+  // conlfict dim coefficient in dist
+  std::cout << "** coefficient of conflict dim in dist is lower than -1:  " << rlt->dist_neg_2 << std::endl;
+  
   
   // control the insert of block step statement
   int step_status = 0; 
@@ -1731,6 +1748,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // detect single dim in conflict region
     int ds_cft = check_dim_single(cft, i_dim); //found any single dim
     std::cout << "==== The dim will be splitted by one point : " << ds_cft << std::endl;
+
    
     //assert(false);
 
@@ -2135,7 +2153,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
     // cut conflict dimension (innermost) by blocks
     //if(iter_in_dist != 1 && i_dim == n_dd-1){
     //if(iter_in_dist != 1 && dist_is_one == 0){
-    if( dist_is_one == 0 ){
+    if( dist_is_one == 0 && rlt->dist_neg_2 == 0 ){
       std::cout << "\n======= Cut conflict (innermost) dimension by blocks ============" << std::endl;
       rlt->blk_pos = i_dim;
       isl_set_free(stmt_dom);

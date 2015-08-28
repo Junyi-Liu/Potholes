@@ -117,6 +117,9 @@ struct stmt_info{
 
   // innermost conflict dep position
   int dep_pos = -1;
+
+  // conflict dim coefficient is equal to -2
+  int dist_neg_2 = 0;
   
   // statement memeory access info
   int n_acc_wr = 0; 
@@ -157,6 +160,12 @@ struct recur_info{
   
   // all outer dimensions have dependence
   int outer_dep;
+
+  // innermost conflict dep position
+  int dep_pos = -1;
+  
+  // conflict dim coefficient is equal to -2
+  int dist_neg_2 = 0;
   
   // loop delay
   int delay;

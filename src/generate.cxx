@@ -1194,7 +1194,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
   int lsp = 0;
   
   if(sw){
-    std::cout << "\n*********** Constructing If(safe): ALL FAST, Else: SLOW or SPLIT ****************" << std::endl; 
+    std::cout << "\n*********** Constructing If(conflict): SLOW or SPLIT, Else: ALL FAST ****************" << std::endl; 
     // generate if guard
     isl_set * guard = isl_set_remove_redundancies(isl_set_complement(isl_set_copy(rlt.param)));
     guard = isl_set_coalesce(guard);
@@ -1254,7 +1254,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node_free(node);
   }
   else{
-    std::cout << "\n*********** No All FAST mode applied ****************" << std::endl; 
+    std::cout << "\n*********** No mode switch applied ****************" << std::endl; 
     
     #ifdef LSP
     if(scop->t == 2){
