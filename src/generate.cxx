@@ -919,7 +919,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
     printer = isl_printer_end_line(printer);  
   }
   
-  std::cout << "Printing loop statements "<< std::endl;
+  std::cout << "Printing loop statements \n"<< std::endl;
 
   printer = isl_printer_start_line(printer);
 
