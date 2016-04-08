@@ -762,30 +762,6 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
     
     // add control for print transformation pragma
-    // if(scop->t == 0){
-    //   stmt->t = 0;
-    //   scop->t = -1;      
-    // }
-    // else if(scop->t == 1){
-    //   stmt->t = 0;
-    //   scop->t = -1;      
-    // }
-    // else if(scop->t == 2){
-    //   // FOR LOOP SPLITTING  
-    //   if( p1==0 || p3==0 || px == 0 || blk==0 || unflt==0){
-    // 	stmt->t = 1; // fast pipelining	
-    //   }
-    //   else if(p2==0){
-    // 	stmt->t = 0; // default pipelining
-    //   }
-    //   else{
-    // 	stmt->t = 2; // nothing added
-    //   }
-    // }
-    // else{
-    //   stmt->t = 2;
-    // }
-
     switch(scop->t) {
       // slow mode
     case 0:{
