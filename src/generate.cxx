@@ -762,16 +762,43 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }
     
     // add control for print transformation pragma
-    if(scop->t == 0){
+    // if(scop->t == 0){
+    //   stmt->t = 0;
+    //   scop->t = -1;      
+    // }
+    // else if(scop->t == 1){
+    //   stmt->t = 0;
+    //   scop->t = -1;      
+    // }
+    // else if(scop->t == 2){
+    //   // FOR LOOP SPLITTING  
+    //   if( p1==0 || p3==0 || px == 0 || blk==0 || unflt==0){
+    // 	stmt->t = 1; // fast pipelining	
+    //   }
+    //   else if(p2==0){
+    // 	stmt->t = 0; // default pipelining
+    //   }
+    //   else{
+    // 	stmt->t = 2; // nothing added
+    //   }
+    // }
+    // else{
+    //   stmt->t = 2;
+    // }
+
+    switch(scop->t) {
+      // slow mode
+    case 0:{
       stmt->t = 0;
-      scop->t = -1;      
-    }
-    else if(scop->t == 1){
+      scop->t = -1;   
+    }break;
+      // PLP: fast mode
+    case 1:{ 
       stmt->t = 0;
-      scop->t = -1;      
-    }
-    else if(scop->t == 2){
-      // FOR LOOP SPLITTING  
+      scop->t = -1;  
+    }break;
+      // LSP
+    case 2:{
       if( p1==0 || p3==0 || px == 0 || blk==0 || unflt==0){
 	stmt->t = 1; // fast pipelining	
       }
@@ -779,12 +806,21 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
 	stmt->t = 0; // default pipelining
       }
       else{
-	stmt->t = 2; // nothing added
-      }
-    }
-    else{
+	stmt->t = 2; // print no pragma
+      }	
+    }break;
+      //PLP: always fast
+    case 3:{ 
+      stmt->t = 1;
+      scop->t = -1;  
+    }break;
+      // Print no pragma
+    default:{
       stmt->t = 2;
+    }break;
     }
+
+    
 
     // apply unflatten loop
     if(unflt==0){
@@ -1107,7 +1143,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     std::cout << "\n*********** ALWAYS IN SAFE REGION ****************" << std::endl;
     std::cout << "Apply pragma for false inter-dependency " << std::endl;
     sw = 0;
-    scop->t = 1;
+    scop->t = 3;
   }
   else{
     // safe region exists
