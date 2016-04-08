@@ -767,7 +767,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
       scop->t = -1;      
     }
     else if(scop->t == 1){
-      stmt->t = 1;
+      stmt->t = 0;
       scop->t = -1;      
     }
     else if(scop->t == 2){
@@ -877,10 +877,8 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   pth_ast_expr * pth_expr = pth_ast_expr_from_isl_ast_expr(lhs_expr);     
 
   // add pragma for forcing pipelining
-  if(stmt->t == 1 ){
+  if(stmt->t == 1){
     std::cout << "printing pragma for fast execution"<< std::endl;
-
-    if(scop->t == -1) stmt->t = 0; // assign 0 for slow part
 
     // always try pipelining
     printer = isl_printer_start_line(printer);
@@ -900,6 +898,10 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
   }
   else if(stmt->t == 0){
     std::cout << "printing pragma for slow execution"<< std::endl;
+
+    // assign 1 for fast mode
+    if(scop->t == -1) stmt->t = 1;
+    
     // always try pipelining!!!!
     std::stringstream ss;
     ss << "#pragma HLS PIPELINE";

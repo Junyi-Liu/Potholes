@@ -1510,7 +1510,7 @@ int dim_blk(__isl_take isl_set * set, __isl_take isl_aff * aff, void * user){
 int splitLoop(pet_scop * scop, recur_info * rlt){
    
   // Show Conflict Region 
-  std::cout << "==== Conflict Region: " << std::endl; 
+  std::cout << "==== Conflict Domain: " << std::endl; 
   isl_set_dump(rlt->cft);
 
   //remove existentially quantified variables
@@ -1534,6 +1534,8 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
   // show scalar dependence distance
   std::cout << "==== dependence distance at conflict dim: " << std::endl;    
   isl_pw_aff_dump(rlt->dist);
+  std::cout << "** Dep Position : " << rlt->dep_pos << std::endl;
+
   int iter_in_dist = isl_pw_aff_involves_dims(rlt->dist, isl_dim_in, 0, isl_pw_aff_dim(rlt->dist, isl_dim_in));
   std::cout << "** contain iterators : " << iter_in_dist << std::endl;
 
@@ -1937,10 +1939,10 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 	std::cout << "==== Too many basic sets for loop splitting" << std::endl;
 	t = 0;
       }
-      if((isl_set_is_empty(dom_1) == 1 ) && (isl_set_is_empty(dom_3) == 1)){
+      if((isl_set_is_empty(dom_1) == 1 ) && (isl_set_is_empty(dom_3) == 1) && dist_is_one == 1){
 	// Special Case: dom_1 and dom_3 are all empty
 	std::cout << "==== Part 1 and Part 3 are all empty: Apply parametric loop pipelining" << std::endl;
-	t = 0;
+	t = 1;
       }
 
       // terminate early for applying parametric loop pipelining
@@ -2289,7 +2291,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       /******************************************
        **  Part 2: Split by blocks
        ******************************************/
-      std::cout << "\n======= Part 2 " << std::endl;
+      std::cout << "\n======= Part 2  " << std::endl;
       std::cout << "*** Domain: " << std::endl;
       //isl_id * stmt_id = isl_set_get_tuple_id(stmt_dom_rcd[i_st]);
 
