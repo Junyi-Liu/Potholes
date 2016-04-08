@@ -786,7 +786,7 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
       }	
     }break;
       //PLP: always fast
-    case 3:{ 
+    case 4:{ 
       stmt->t = 1;
       scop->t = -1;  
     }break;
@@ -1119,7 +1119,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     std::cout << "\n*********** ALWAYS IN SAFE REGION ****************" << std::endl;
     std::cout << "Apply pragma for false inter-dependency " << std::endl;
     sw = 0;
-    scop->t = 3;
+    scop->t = 4;
   }
   else{
     // safe region exists
