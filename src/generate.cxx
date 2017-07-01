@@ -765,16 +765,19 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     switch(scop->t) {
       // slow mode
     case 0:{
+      std::cout << "=== Slow Mode" << std::endl;
       stmt->t = 0;
       scop->t = -1;   
     }break;
       // PLP: fast mode
     case 1:{ 
-      stmt->t = 0;
+      std::cout << "=== Fast Mode" << std::endl;
+      stmt->t = 1;
       scop->t = -1;  
     }break;
       // LSP
     case 2:{
+      std::cout << "=== Splitting Mode" << std::endl;
       if( p1==0 || p3==0 || px == 0 || blk==0 || unflt==0){
 	stmt->t = 1; // fast pipelining	
       }
@@ -787,11 +790,13 @@ isl_ast_node * pth_generate_user_statement(isl_ast_build * build, void * user) {
     }break;
       //PLP: always fast
     case 4:{ 
+      std::cout << "=== PLP: Always Fast Mode" << std::endl;
       stmt->t = 1;
       scop->t = -1;  
     }break;
       // Print no pragma
     default:{
+      std::cout << "=== No Pragma" << std::endl;
       stmt->t = 2;
     }break;
     }
@@ -912,7 +917,7 @@ isl_printer * pth_print_assign_statement(isl_printer * printer, isl_ast_print_op
     std::cout << "printing pragma for slow execution"<< std::endl;
 
     // assign 1 for fast mode
-    if(scop->t == -1) stmt->t = 1;
+    //if(scop->t == -1) stmt->t = 1;
     
     // always try pipelining!!!!
     std::stringstream ss;
@@ -1246,6 +1251,11 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
       scop->blk_pos = rlt.blk_pos;
       scop->dist = isl_pw_aff_copy(rlt.dist);
     }
+#endif
+
+#ifdef PLP
+    scop->t = 0;
+#endif
 
     //pet_scop_dump(pscop);
     
@@ -1259,7 +1269,7 @@ std::string pth_generate_scop_function_replace(pet_scop * pscop, std::string fun
     isl_ast_node_free(node);
     node = isl_ast_build_ast_from_schedule(build, schedule);
     
-#endif
+
 
     // AST of slow or split mode: then statement
     p_ast->u.i.then = isl_ast_node_copy(node);
