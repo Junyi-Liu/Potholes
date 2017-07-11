@@ -623,6 +623,7 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
 
   // Propose best initial interval considering 2 port per memory
   // just consider the array with write access !!!!!!!
+  /*
   int mem_port = 1;
   for(int j=0; j<stmt.n_acc_wr; j++){
     int tmp_port = 1;
@@ -639,21 +640,28 @@ void analyzeScop(pet_scop * scop, VarMap * vm, VarMap * tm, recur_info * rlt){
   std::cout<< "*** required memory port: " << mem_port << std::endl;
   stmt.II = ceil(float(mem_port)/2);
   std::cout<< "*** proposed best II: " << stmt.II << std::endl;
+  */
 
   // Read data file for statement delay infomation
-  std::string line;
+  std::string line1,line2;
   std::ifstream datfile (delay_info_path);
   if(datfile.is_open()){
-    getline(datfile, line);
     std::cout<< "*** Reading info " << std::endl;
+    getline(datfile, line1);
+    getline(datfile, line2);
+    assert(line1 != "");
+    assert(line2 != "");
     datfile.close();
   }
   else{
-    std::cout<< "*** Cannot read daley info file" << line << std::endl;
+    std::cout<< "*** Cannot read delay information file" << std::endl;
     assert(false);
   }
-  std::istringstream (line) >> stmt.L_delay;
-  std::cout<< "*** Delay info: " << stmt.L_delay << std::endl;
+  std::istringstream (line1) >> stmt.L_delay;
+  std::cout<< "*** Extracted Delay: " << stmt.L_delay << std::endl;
+  std::istringstream (line2) >> stmt.II;
+  std::cout<< "*** Extracted II: " << stmt.II << std::endl;
+
   rlt->delay = stmt.L_delay;
   // ** assume that delay will not increase over 1.2 times
   // take iteration delay
