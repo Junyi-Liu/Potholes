@@ -1645,6 +1645,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
 
     // detect bound aff
     int n_d = (n_cd < n_dd) ? n_cd : n_dd;
+/*
     i_dim = -1;
     // isl_aff * s_dsize;
     // isl_aff * c_dsize;
@@ -1666,6 +1667,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       }
     }
     isl_set_free(sdom_no_divs);
+*/
+
+    int i_dim = (rlt->dep_pos < n_dd) ? rlt->dep_pos : -1;
 
     std::cout << "==== Dimension to be splitted: " << i_dim << std::endl;
 
@@ -1676,11 +1680,16 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       continue;
     }
 
+    // detect single dim in conflict region
+    int ds_cft = check_dim_single(rlt->cft, i_dim); //found any single dim
+    std::cout << "==== The dim will be splitted by one point : " << ds_cft << std::endl;
+
     // get statement id
     isl_id * stmt_id = isl_set_get_tuple_id(stmt_dom_rcd[i_st]);
 
-    // dependency locates in the inner-most dimension and across the outer dimension
-    if(i_dim == n_cd-1 && rlt->outer_dep == 1){
+    // dep dimension is at 2nd-innermost loop when dep_dist is one,
+    // and there is not one-point memory conflict
+    if(i_dim+1 == n_cd-1 && dist_is_one == 1 && ds_cft == 0){
     //if(rlt->outer_dep == 1){
       std::cout << "\n======= Cut innermost dimension by unflatten loop " << std::endl;
 
@@ -1693,7 +1702,7 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       //scop->stmts = isl_realloc(ctx, scop->stmts, struct pet_stmt *, sizeof(struct pet_stmt *) * scop->n_stmt);
 
       // whether the first stmt at its inner-most dim of stmt schedule map
-      int sch_dim_first = sch_dim_zero(stmt_sch, i_dim);
+      int sch_dim_first = sch_dim_zero(stmt_sch, n_cd-1);
       std::cout << "===== Current stmt is the first of its inner-most schedule dim: " << sch_dim_first << std::endl;
       isl_map_dump(stmt_sch);
 
@@ -1756,13 +1765,9 @@ int splitLoop(pet_scop * scop, recur_info * rlt){
       pnt_lexmax = isl_set_copy(cft_lexmax);
     }
 
-    // detect single dim in conflict region
-    int ds_cft = check_dim_single(cft, i_dim); //found any single dim
-    std::cout << "==== The dim will be splitted by one point : " << ds_cft << std::endl;
-
 
     //assert(false);
-
+    // Memory conflict patterns: non-uniform or single point or sequential
     if(iter_in_dist == 1 || ds_cft == 1 || dist_is_one == 1){
 
       // Cut loop dimension i_dim by the LEXMAX point
